@@ -27,6 +27,8 @@ import CalendarPanel from './components/panels/CalendarPanel';
 import PendingConfirmationCard from './components/PendingConfirmationCard';
 import UpcomingExpensesCard from './components/UpcomingExpensesCard';
 import HealthScoreGauge, { calculateHealthScore } from './components/HealthScoreGauge';
+import InstallPrompt from './components/InstallPrompt';
+import MobileNav from './components/MobileNav';
 
 export default function App() {
   const [activeView, setActiveView] = useState('overview');
@@ -245,6 +247,12 @@ export default function App() {
         connectionStatus={connectionStatus}
       />
       <main className="main-content">{renderView()}</main>
+      <MobileNav
+        activeView={activeView}
+        setActiveView={setActiveView}
+        pendingCount={pendingPaychecks.length}
+      />
+      <InstallPrompt />
     </div>
   );
 }

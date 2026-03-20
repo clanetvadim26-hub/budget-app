@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Navy background circle -->
+  <circle cx="256" cy="256" r="256" fill="#0A0F1E"/>
+
+  <!-- Bar chart columns -->
+  <rect x="90"  y="295" width="72" height="125" rx="10" fill="#D4AF37" opacity="0.6"/>
+  <rect x="192" y="210" width="72" height="210" rx="10" fill="#D4AF37"/>
+  <rect x="294" y="248" width="72" height="172" rx="10" fill="#D4AF37" opacity="0.8"/>
+  <rect x="396" y="175" width="72" height="245" rx="10" fill="#D4AF37" opacity="0.5"/>
+
+  <!-- Trend line -->
+  <polyline
+    points="126,285 228,200 330,238 432,165"
+    stroke="#F1F5F9"
+    stroke-width="14"
+    fill="none"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Trend dots -->
+  <circle cx="126" cy="285" r="12" fill="#F1F5F9"/>
+  <circle cx="228" cy="200" r="12" fill="#F1F5F9"/>
+  <circle cx="330" cy="238" r="12" fill="#F1F5F9"/>
+  <circle cx="432" cy="165" r="14" fill="#D4AF37" stroke="#F1F5F9" stroke-width="4"/>
+
+  <!-- Bottom label bar -->
+  <rect x="90" y="435" width="378" height="8" rx="4" fill="#D4AF37" opacity="0.3"/>
+</svg>
