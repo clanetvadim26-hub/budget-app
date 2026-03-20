@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Read(//c/Users/clane/.claude/projects/C--Users-clane-budget-app/**)",
+      "Read(//c/Users/clane/.claude/projects/C--Users-clane-budget-app/memory/**)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm install:*)",
+      "Bash(npm list:*)"
+    ]
+  }
+}
