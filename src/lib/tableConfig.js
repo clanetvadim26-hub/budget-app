@@ -80,6 +80,24 @@ const recExpenseToRow = (item) => ({
   active:     item.active !== false,
 });
 
+// Roth IRA contributions
+const rothContribFromRow = (r) => ({
+  id:        r.id,
+  accountId: r.account_id,
+  taxYear:   r.tax_year,
+  date:      r.date,
+  amount:    num(r.amount),
+  notes:     r.notes || '',
+});
+const rothContribToRow = (item) => ({
+  id:         item.id,
+  account_id: item.accountId,
+  tax_year:   item.taxYear,
+  date:       item.date,
+  amount:     item.amount,
+  notes:      item.notes || null,
+});
+
 // Accounts
 const accountFromRow = (r) => ({
   id:                 r.id,
@@ -88,6 +106,7 @@ const accountFromRow = (r) => ({
   type:               r.type,
   institution:        r.institution        || '',
   color:              r.color              || '',
+  catchUp:            r.catch_up           || false,
   balance:            num(r.balance),
   targetGoal:         num(r.target_goal),
   monthlyContribution:num(r.monthly_contribution),
@@ -110,6 +129,7 @@ const accountToRow = (item) => ({
   type:                item.type,
   institution:         item.institution         || null,
   color:               item.color               || null,
+  catch_up:            item.catchUp             || false,
   balance:             item.balance            || 0,
   target_goal:         item.targetGoal         || 0,
   monthly_contribution:item.monthlyContribution|| 0,
@@ -286,6 +306,12 @@ export const TABLE_CONFIG = {
     fromRow: loanFromRow, toRow: loanToRow,
     load: (key, def) => loadArray(TABLE_CONFIG.budget_loans, key, def),
     sync: (prev, next) => syncArray(TABLE_CONFIG.budget_loans, prev, next),
+  },
+  budget_roth_contributions: {
+    type: 'array', table: 'roth_contributions',
+    fromRow: rothContribFromRow, toRow: rothContribToRow,
+    load: (key, def) => loadArray(TABLE_CONFIG.budget_roth_contributions, key, def),
+    sync: (prev, next) => syncArray(TABLE_CONFIG.budget_roth_contributions, prev, next),
   },
 
   // ── Savings goals (object) ────────────────────────────────────────────

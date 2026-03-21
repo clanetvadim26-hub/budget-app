@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META } from '../../data/accounts';
+import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/accounts';
 import { formatCurrency } from '../../utils/calculations';
-
-const ROTH_ANNUAL_TARGET = 14000;
-const ROTH_MONTHLY = 583;
+import RetirementDetailDrawer from '../RetirementDetailDrawer';
+import {
+  ROTH_YEARS, deadlineLabel, daysUntilDeadline,
+  getRothLimit, getTotalContributed, getYearStatus, YEAR_STATUS_META,
+  defaultRothYear, PHASE_OUT_MFJ_2025,
+} from '../../utils/rothIRA';
 
 function DonutTooltip({ active, payload }) {
   if (active && payload && payload.length) {
@@ -19,30 +22,17 @@ function DonutTooltip({ active, payload }) {
   return null;
 }
 
-function ProgressBar({ current, target, color, label, sublabel }) {
-  const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+function TrackerCard({ icon, title, color, children, onClick }) {
   return (
-    <div className="invest-progress">
-      <div className="invest-progress-header">
-        <span className="invest-progress-label">{label}</span>
-        <span style={{ color, fontWeight: 700, fontSize: 14 }}>
-          {formatCurrency(current)} <span style={{ color: '#64748B', fontWeight: 400 }}>/ {formatCurrency(target)}</span>
-        </span>
-      </div>
-      <div className="progress-bar-wrap">
-        <div className="progress-bar-fill" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
-      {sublabel && <div className="invest-progress-sub">{sublabel}</div>}
-    </div>
-  );
-}
-
-function TrackerCard({ icon, title, color, children }) {
-  return (
-    <div className="tracker-card" style={{ borderTopColor: color }}>
+    <div
+      className={`tracker-card ${onClick ? 'tracker-card-clickable' : ''}`}
+      style={{ borderTopColor: color }}
+      onClick={onClick}
+    >
       <div className="tracker-card-header">
         <span className="tracker-icon">{icon}</span>
         <span className="tracker-title" style={{ color }}>{title}</span>
+        {onClick && <span className="tracker-details-hint">View Details →</span>}
       </div>
       {children}
     </div>
@@ -58,54 +48,99 @@ function StatRow({ label, value, valueColor }) {
   );
 }
 
+function YearSelector({ selectedYear, onChange }) {
+  return (
+    <div className="year-selector">
+      {ROTH_YEARS.map((y) => (
+        <button
+          key={y}
+          className={`year-btn ${selectedYear === y ? 'active' : ''}`}
+          onClick={() => onChange(y)}
+        >
+          {y}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RothAccountBar({ account, contributions, selectedYear, onOpenDrawer }) {
+  const contributed = getTotalContributed(contributions, account.id, selectedYear);
+  const limit       = getRothLimit(selectedYear, account.catchUp);
+  const pct         = limit > 0 ? Math.min((contributed / limit) * 100, 100) : 0;
+  const status      = getYearStatus(selectedYear, contributed, limit);
+  const statusMeta  = YEAR_STATUS_META[status];
+  const ownerColor  = OWNER_COLORS[account.owner] || '#94A3B8';
+
+  return (
+    <div className="roth-account-bar" onClick={onOpenDrawer}>
+      <div className="roth-bar-header">
+        <span className="roth-bar-owner" style={{ color: ownerColor }}>
+          {account.owner === 'Vadim' ? '👨' : '👩'} {account.name}
+          {account.catchUp && <span className="roth-catchup-chip">50+ catch-up</span>}
+        </span>
+        <span className="roth-bar-status" style={{ color: statusMeta.color }}>{statusMeta.label}</span>
+      </div>
+      <div className="roth-bar-amounts">
+        <span style={{ color: '#D4AF37', fontWeight: 700 }}>{formatCurrency(contributed)}</span>
+        <span style={{ color: '#64748B' }}> / {formatCurrency(limit)}</span>
+      </div>
+      <div className="progress-bar-wrap" style={{ marginBottom: 4 }}>
+        <div className="progress-bar-fill" style={{ width: `${pct}%`, backgroundColor: statusMeta.color }} />
+      </div>
+      <div className="roth-bar-footer">
+        <span>{pct.toFixed(0)}% of {selectedYear} limit</span>
+        <span className="roth-bar-details-link">Details & History →</span>
+      </div>
+    </div>
+  );
+}
+
+const INVESTMENT_TYPES = ['roth_ira', 'traditional_ira', '401k', '403b', 'hsa', 'brokerage', 'reit', 'crypto'];
+const DONUT_COLORS = {
+  'Roth IRA': '#D4AF37', 'Traditional IRA': '#C9A227', '401k': '#A78BFA', '403b': '#8B5CF6',
+  HSA: '#2DD4BF', Brokerage: '#38BDF8', REIT: '#FB923C', Crypto: '#F59E0B',
+};
+
 export default function InvestmentsPanel() {
-  const [accounts] = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
+  const [accounts]      = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
+  const [contributions] = useLocalStorage('budget_roth_contributions', []);
+  const [selectedYear,  setSelectedYear]      = useState(defaultRothYear());
+  const [drawerAccountId, setDrawerAccountId] = useState(null);
 
-  const inv = (id) => accounts.find((a) => a.id === id) || {};
+  const iraAccounts     = accounts.filter((a) => a.type === 'roth_ira' || a.type === 'traditional_ira');
+  const rothAccounts    = accounts.filter((a) => a.type === 'roth_ira');
+  const k401Accounts    = accounts.filter((a) => a.type === '401k' || a.type === '403b');
+  const taxableAccounts = accounts.filter((a) => ['brokerage', 'reit', 'crypto', 'hsa'].includes(a.type));
 
-  const rothVadim = inv('roth_ira_vadim');
-  const rothJessica = inv('roth_ira_jessica');
-  const k401Vadim = inv('401k_vadim');
-  const k401Jessica = inv('401k_jessica');
-  const brokerage = inv('brokerage_joint');
-  const reit = inv('reit_vadim');
-
-  const rothVadimYTD = rothVadim.ytdContributions || 0;
-  const rothJessicaYTD = rothJessica.ytdContributions || 0;
-  const combinedRothYTD = rothVadimYTD + rothJessicaYTD;
-
-  const monthsElapsed = new Date().getMonth() + 1;
-  const rothOnTrackTarget = ROTH_MONTHLY * 2 * monthsElapsed;
-
-  // Total invested
-  const investmentTypes = ['roth_ira', '401k', 'brokerage', 'reit'];
   const totalInvested = accounts
-    .filter((a) => investmentTypes.includes(a.type))
+    .filter((a) => INVESTMENT_TYPES.includes(a.type))
     .reduce((s, a) => s + (a.balance || 0), 0);
 
-  // Donut data
   const typeGroups = {};
   accounts
-    .filter((a) => investmentTypes.includes(a.type) && (a.balance || 0) > 0)
+    .filter((a) => INVESTMENT_TYPES.includes(a.type) && (a.balance || 0) > 0)
     .forEach((a) => {
       const label = ACCOUNT_TYPE_META[a.type]?.label || a.type;
       typeGroups[label] = (typeGroups[label] || 0) + a.balance;
     });
-
   const donutData = Object.entries(typeGroups).map(([name, value]) => ({ name, value }));
-  const donutColors = { 'Roth IRA': '#D4AF37', '401k': '#A78BFA', Brokerage: '#38BDF8', REIT: '#FB923C' };
 
-  // REIT
-  const reitReturn = (reit.balance || 0) - (reit.totalContributed || 0);
-  const reitReturnPct = (reit.totalContributed || 0) > 0 ? (reitReturn / reit.totalContributed) * 100 : 0;
+  // Combined Roth progress for selected year
+  const combinedContributed = rothAccounts.reduce(
+    (sum, a) => sum + getTotalContributed(contributions, a.id, selectedYear), 0,
+  );
+  const combinedLimit = rothAccounts.reduce(
+    (sum, a) => sum + getRothLimit(selectedYear, a.catchUp), 0,
+  );
+  const combinedPct = combinedLimit > 0 ? Math.min((combinedContributed / combinedLimit) * 100, 100) : 0;
+  const daysLeft    = daysUntilDeadline(selectedYear);
 
-  // Brokerage
-  const brokerageReturn = (brokerage.balance || 0) - (brokerage.totalContributed || 0);
-  const brokerageReturnPct = (brokerage.totalContributed || 0) > 0 ? (brokerageReturn / brokerage.totalContributed) * 100 : 0;
+  const drawerAccount = drawerAccountId ? accounts.find((a) => a.id === drawerAccountId) : null;
 
   return (
     <div>
-      {/* Hero */}
+      {/* ── Portfolio Hero ──────────────────────────────────────────── */}
       <div className="panel">
         <div className="panel-header">
           <h2>Investment Portfolio</h2>
@@ -122,14 +157,11 @@ export default function InvestmentsPanel() {
                 <PieChart>
                   <Pie data={donutData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                     {donutData.map((entry) => (
-                      <Cell key={entry.name} fill={donutColors[entry.name] || '#94A3B8'} stroke="transparent" />
+                      <Cell key={entry.name} fill={DONUT_COLORS[entry.name] || '#94A3B8'} stroke="transparent" />
                     ))}
                   </Pie>
                   <Tooltip content={<DonutTooltip />} />
-                  <Legend
-                    formatter={(value) => <span style={{ color: '#CBD5E1', fontSize: 12 }}>{value}</span>}
-                    iconSize={8}
-                  />
+                  <Legend formatter={(v) => <span style={{ color: '#CBD5E1', fontSize: 12 }}>{v}</span>} iconSize={8} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -141,112 +173,159 @@ export default function InvestmentsPanel() {
         </div>
       </div>
 
-      {/* Roth IRA */}
+      {/* ── Roth / Traditional IRA ──────────────────────────────────── */}
       <div className="panel">
         <div className="panel-header">
-          <h2>Roth IRA Progress</h2>
-          <span className="panel-subtitle">Combined — $14,000/year target</span>
+          <h2>IRA Contributions</h2>
+          <span className="panel-subtitle">{selectedYear} tax year</span>
         </div>
-        <ProgressBar
-          current={combinedRothYTD}
-          target={ROTH_ANNUAL_TARGET}
-          color="#D4AF37"
-          label="Combined YTD Contributions (Vadim + Jessica)"
-          sublabel={`On-track target for ${monthsElapsed} months elapsed: ${formatCurrency(rothOnTrackTarget)} · Remaining: ${formatCurrency(Math.max(0, ROTH_ANNUAL_TARGET - combinedRothYTD))}`}
+
+        <YearSelector selectedYear={selectedYear} onChange={setSelectedYear} />
+
+        {/* Deadline banners */}
+        {daysLeft > 0 && daysLeft <= 30 ? (
+          <div className="roth-deadline-banner warning">
+            ⚠ {selectedYear} contributions close in <strong>{daysLeft} days</strong> — deadline is {deadlineLabel(selectedYear)}
+          </div>
+        ) : daysLeft <= 0 ? (
+          <div className="roth-deadline-banner error">
+            ✕ {selectedYear} contribution deadline ({deadlineLabel(selectedYear)}) has passed
+          </div>
+        ) : (
+          <div className="roth-deadline-banner info">
+            📅 {selectedYear} contributions open until <strong>{deadlineLabel(selectedYear)}</strong>
+          </div>
+        )}
+
+        {/* Income phase-out notice */}
+        <div className="roth-phaseout-notice">
+          <span className="roth-phaseout-icon">ℹ</span>
+          <span>
+            2025 Roth IRA eligibility phases out at{' '}
+            <strong>${PHASE_OUT_MFJ_2025.start.toLocaleString()}–${PHASE_OUT_MFJ_2025.end.toLocaleString()}</strong>{' '}
+            MAGI (married filing jointly) · <em>Single/HoH: $150k–$165k</em>
+          </span>
+        </div>
+
+        {/* Per-account progress bars */}
+        {iraAccounts.length > 0 ? (
+          <>
+            <div className="roth-accounts-list">
+              {iraAccounts.map((a) => (
+                <RothAccountBar
+                  key={a.id}
+                  account={a}
+                  contributions={contributions}
+                  selectedYear={selectedYear}
+                  onOpenDrawer={() => setDrawerAccountId(a.id)}
+                />
+              ))}
+            </div>
+
+            {/* Combined bar (only shown with multiple Roth accounts) */}
+            {rothAccounts.length > 1 && (
+              <div className="roth-combined-bar">
+                <div className="roth-combined-header">
+                  <span className="roth-combined-label">Combined Roth IRA — {selectedYear}</span>
+                  <span style={{ color: '#D4AF37', fontWeight: 700 }}>
+                    {formatCurrency(combinedContributed)} / {formatCurrency(combinedLimit)}
+                  </span>
+                </div>
+                <div className="progress-bar-wrap">
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${combinedPct}%`, backgroundColor: combinedPct >= 100 ? '#4ADE80' : '#D4AF37' }}
+                  />
+                </div>
+                <div className="roth-combined-sub">
+                  {combinedPct.toFixed(0)}% of {formatCurrency(combinedLimit)} combined limit
+                  {combinedContributed < combinedLimit
+                    ? ` · ${formatCurrency(combinedLimit - combinedContributed)} remaining`
+                    : ' · Fully maxed out!'}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="empty-state">No IRA accounts found. Add one in the Accounts tab.</div>
+        )}
+      </div>
+
+      {/* ── 401k / 403b ─────────────────────────────────────────────── */}
+      {k401Accounts.length > 0 && (
+        <div className="panel">
+          <div className="panel-header"><h2>401k / 403b Accounts</h2></div>
+          <div className="roth-individual">
+            {k401Accounts.map((a) => {
+              const ownerColor = OWNER_COLORS[a.owner] || '#94A3B8';
+              const meta       = ACCOUNT_TYPE_META[a.type] || {};
+              const nodeColor  = a.color || meta.color || '#A78BFA';
+              const ytd        = a.ytdContributions || 0;
+              const target     = a.annualTarget || 0;
+              const pct        = target > 0 ? Math.min((ytd / target) * 100, 100) : 0;
+              return (
+                <TrackerCard
+                  key={a.id}
+                  icon={meta.icon || '🏛️'}
+                  title={a.name}
+                  color={ownerColor}
+                  onClick={() => setDrawerAccountId(a.id)}
+                >
+                  <StatRow label="Current Balance" value={formatCurrency(a.balance || 0)} />
+                  <StatRow label="YTD Contributions" value={formatCurrency(ytd)} valueColor={nodeColor} />
+                  <StatRow label="Monthly Contribution" value={`${formatCurrency(a.monthlyContribution || 0)}/mo`} />
+                  {target > 0 && (
+                    <>
+                      <StatRow label="Annual Target" value={formatCurrency(target)} />
+                      <div className="progress-bar-wrap" style={{ marginTop: 8 }}>
+                        <div className="progress-bar-fill" style={{ width: `${pct}%`, backgroundColor: nodeColor }} />
+                      </div>
+                    </>
+                  )}
+                </TrackerCard>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Taxable Investments ─────────────────────────────────────── */}
+      {taxableAccounts.length > 0 && (
+        <div className="panel">
+          <div className="panel-header"><h2>Taxable Investments</h2></div>
+          <div className="roth-individual">
+            {taxableAccounts.map((a) => {
+              const meta       = ACCOUNT_TYPE_META[a.type] || {};
+              const nodeColor  = a.color || meta.color || '#38BDF8';
+              const totalContr = a.totalContributed || 0;
+              const returnAmt  = (a.balance || 0) - totalContr;
+              const returnPct  = totalContr > 0 ? (returnAmt / totalContr) * 100 : 0;
+              return (
+                <TrackerCard key={a.id} icon={meta.icon || '💼'} title={a.name} color={nodeColor}>
+                  <StatRow label="Current Balance" value={formatCurrency(a.balance || 0)} />
+                  <StatRow label="Total Contributed" value={formatCurrency(totalContr)} />
+                  <StatRow label="Monthly Contribution" value={`${formatCurrency(a.monthlyContribution || 0)}/mo`} />
+                  {totalContr > 0 && (
+                    <StatRow
+                      label="Return"
+                      value={`${formatCurrency(returnAmt)} (${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}%)`}
+                      valueColor={returnAmt >= 0 ? '#4ADE80' : '#F87171'}
+                    />
+                  )}
+                </TrackerCard>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Retirement Detail Drawer ─────────────────────────────────── */}
+      {drawerAccount && (
+        <RetirementDetailDrawer
+          account={drawerAccount}
+          onClose={() => setDrawerAccountId(null)}
         />
-        <div className="roth-individual">
-          <TrackerCard icon="👨" title="Vadim Roth IRA" color="#60A5FA">
-            <StatRow label="Current Balance" value={formatCurrency(rothVadim.balance || 0)} />
-            <StatRow label="YTD Contributions" value={formatCurrency(rothVadimYTD)} valueColor="#D4AF37" />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(rothVadim.monthlyContribution || 583)}/mo`} />
-            <StatRow
-              label="Annual Goal"
-              value={`${formatCurrency(rothVadimYTD)} / $7,000`}
-              valueColor={rothVadimYTD >= 7000 ? '#4ADE80' : '#FACC15'}
-            />
-            <div className="progress-bar-wrap" style={{ marginTop: 8 }}>
-              <div className="progress-bar-fill" style={{ width: `${Math.min((rothVadimYTD / 7000) * 100, 100)}%`, backgroundColor: '#D4AF37' }} />
-            </div>
-          </TrackerCard>
-          <TrackerCard icon="👩" title="Jessica Roth IRA" color="#F472B6">
-            <StatRow label="Current Balance" value={formatCurrency(rothJessica.balance || 0)} />
-            <StatRow label="YTD Contributions" value={formatCurrency(rothJessicaYTD)} valueColor="#D4AF37" />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(rothJessica.monthlyContribution || 583)}/mo`} />
-            <StatRow
-              label="Annual Goal"
-              value={`${formatCurrency(rothJessicaYTD)} / $7,000`}
-              valueColor={rothJessicaYTD >= 7000 ? '#4ADE80' : '#FACC15'}
-            />
-            <div className="progress-bar-wrap" style={{ marginTop: 8 }}>
-              <div className="progress-bar-fill" style={{ width: `${Math.min((rothJessicaYTD / 7000) * 100, 100)}%`, backgroundColor: '#F472B6' }} />
-            </div>
-          </TrackerCard>
-        </div>
-      </div>
-
-      {/* 401k */}
-      <div className="panel">
-        <div className="panel-header">
-          <h2>401k Accounts</h2>
-        </div>
-        <div className="roth-individual">
-          <TrackerCard icon="👨" title="Vadim 401k" color="#A78BFA">
-            <StatRow label="Current Balance" value={formatCurrency(k401Vadim.balance || 0)} />
-            <StatRow label="YTD Contributions" value={formatCurrency(k401Vadim.ytdContributions || 0)} valueColor="#A78BFA" />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(k401Vadim.monthlyContribution || 0)}/mo`} />
-            {(k401Vadim.annualTarget || 0) > 0 && (
-              <>
-                <StatRow label="Annual Target" value={formatCurrency(k401Vadim.annualTarget)} />
-                <div className="progress-bar-wrap" style={{ marginTop: 8 }}>
-                  <div className="progress-bar-fill" style={{ width: `${Math.min(((k401Vadim.ytdContributions || 0) / k401Vadim.annualTarget) * 100, 100)}%`, backgroundColor: '#A78BFA' }} />
-                </div>
-              </>
-            )}
-          </TrackerCard>
-          <TrackerCard icon="👩" title="Jessica 401k" color="#A78BFA">
-            <StatRow label="Current Balance" value={formatCurrency(k401Jessica.balance || 0)} />
-            <StatRow label="YTD Contributions" value={formatCurrency(k401Jessica.ytdContributions || 0)} valueColor="#A78BFA" />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(k401Jessica.monthlyContribution || 0)}/mo`} />
-            {(k401Jessica.annualTarget || 0) > 0 && (
-              <>
-                <StatRow label="Annual Target" value={formatCurrency(k401Jessica.annualTarget)} />
-                <div className="progress-bar-wrap" style={{ marginTop: 8 }}>
-                  <div className="progress-bar-fill" style={{ width: `${Math.min(((k401Jessica.ytdContributions || 0) / k401Jessica.annualTarget) * 100, 100)}%`, backgroundColor: '#A78BFA' }} />
-                </div>
-              </>
-            )}
-          </TrackerCard>
-        </div>
-      </div>
-
-      {/* Brokerage + REIT */}
-      <div className="panel">
-        <div className="panel-header">
-          <h2>Taxable Investments</h2>
-        </div>
-        <div className="roth-individual">
-          <TrackerCard icon="💼" title="Ameriprise Joint Brokerage" color="#38BDF8">
-            <StatRow label="Current Balance" value={formatCurrency(brokerage.balance || 0)} />
-            <StatRow label="Total Contributed" value={formatCurrency(brokerage.totalContributed || 0)} />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(brokerage.monthlyContribution || 0)}/mo`} />
-            <StatRow
-              label="Return"
-              value={`${formatCurrency(brokerageReturn)} (${brokerageReturnPct >= 0 ? '+' : ''}${brokerageReturnPct.toFixed(1)}%)`}
-              valueColor={brokerageReturn >= 0 ? '#4ADE80' : '#F87171'}
-            />
-          </TrackerCard>
-          <TrackerCard icon="🏘️" title="Vadim REIT Account" color="#FB923C">
-            <StatRow label="Current Balance" value={formatCurrency(reit.balance || 0)} />
-            <StatRow label="Total Contributed" value={formatCurrency(reit.totalContributed || 0)} />
-            <StatRow label="Monthly Contribution" value={`${formatCurrency(reit.monthlyContribution || 0)}/mo`} />
-            <StatRow
-              label="Return"
-              value={`${formatCurrency(reitReturn)} (${reitReturnPct >= 0 ? '+' : ''}${reitReturnPct.toFixed(1)}%)`}
-              valueColor={reitReturn >= 0 ? '#4ADE80' : '#F87171'}
-            />
-          </TrackerCard>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

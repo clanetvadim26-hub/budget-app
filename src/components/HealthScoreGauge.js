@@ -85,22 +85,21 @@ export function calculateHealthScore({ savingsRate, monthlyExpenses, savings, ac
       : null,
   });
 
-  // 3. Roth IRA progress (0-20 pts)
-  const rothVadim = accounts.find((a) => a.id === 'roth_ira_vadim');
-  const rothJessica = accounts.find((a) => a.id === 'roth_ira_jessica');
-  const combinedRothYTD = (rothVadim?.ytdContributions || 0) + (rothJessica?.ytdContributions || 0);
-  const monthsElapsed = new Date().getMonth() + 1;
-  const rothTarget = 14000;
-  const rothOnTrack = monthsElapsed > 0 ? (combinedRothYTD / ((rothTarget / 12) * monthsElapsed)) : 0;
-  const rothPts = Math.min(20, Math.max(0, rothOnTrack * 20));
+  // 3. Roth IRA progress (0-20 pts) — uses ytdContributions from all Roth accounts dynamically
+  const rothAccounts    = accounts.filter((a) => a.type === 'roth_ira');
+  const combinedRothYTD = rothAccounts.reduce((s, a) => s + (a.ytdContributions || 0), 0);
+  const rothTarget      = rothAccounts.length * 7000 || 14000; // $7,000 per person
+  const monthsElapsed   = new Date().getMonth() + 1;
+  const rothOnTrack     = monthsElapsed > 0 ? (combinedRothYTD / ((rothTarget / 12) * monthsElapsed)) : 0;
+  const rothPts         = Math.min(20, Math.max(0, rothOnTrack * 20));
   score += rothPts;
   breakdown.push({
     label: 'Roth IRA Contributions',
     points: rothPts,
     max: 20,
-    description: `$${combinedRothYTD.toLocaleString()} contributed YTD toward $14,000 annual goal`,
+    description: `${formatCurrency(combinedRothYTD)} contributed YTD toward ${formatCurrency(rothTarget)} annual goal`,
     tip: combinedRothYTD < (rothTarget / 12) * monthsElapsed
-      ? 'Increase monthly Roth IRA contributions to $583/person to stay on track'
+      ? 'Increase monthly Roth IRA contributions to stay on track for the annual limit'
       : null,
   });
 
@@ -124,8 +123,9 @@ export function calculateHealthScore({ savingsRate, monthlyExpenses, savings, ac
   });
 
   // 5. Investment diversification (0-15 pts)
-  const hasRetirement = accounts.some((a) => (a.type === 'roth_ira' || a.type === '401k') && a.balance > 0);
-  const hasBrokerage = accounts.some((a) => a.type === 'brokerage' && a.balance > 0);
+  const retirementTypes = ['roth_ira', 'traditional_ira', '401k', '403b', 'hsa'];
+  const hasRetirement  = accounts.some((a) => retirementTypes.includes(a.type) && a.balance > 0);
+  const hasBrokerage   = accounts.some((a) => ['brokerage', 'crypto'].includes(a.type) && a.balance > 0);
   const hasAlternative = accounts.some((a) => a.type === 'reit' && a.balance > 0);
   const divPts = (hasRetirement ? 7 : 0) + (hasBrokerage ? 5 : 0) + (hasAlternative ? 3 : 0);
   score += divPts;
