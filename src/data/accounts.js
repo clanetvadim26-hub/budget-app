@@ -1,11 +1,26 @@
 export const ACCOUNT_TYPE_META = {
-  checking:  { label: 'Checking',      icon: '🏦', color: '#60A5FA', group: 'liquid',     isLiability: false },
-  savings:   { label: 'Savings',       icon: '💰', color: '#4ADE80', group: 'liquid',     isLiability: false },
-  credit:    { label: 'Credit Card',   icon: '💳', color: '#F87171', group: 'liability',  isLiability: true  },
-  roth_ira:  { label: 'Roth IRA',      icon: '📈', color: '#D4AF37', group: 'retirement', isLiability: false },
-  '401k':    { label: '401k',          icon: '🏛️', color: '#A78BFA', group: 'retirement', isLiability: false },
-  brokerage: { label: 'Brokerage',     icon: '💼', color: '#38BDF8', group: 'investment', isLiability: false },
-  reit:      { label: 'REIT',          icon: '🏘️', color: '#FB923C', group: 'investment', isLiability: false },
+  // Liquid
+  checking:         { label: 'Checking',           icon: '🏦', color: '#60A5FA', group: 'liquid',     isLiability: false, isCredit: false, isInvestment: false },
+  savings:          { label: 'Savings',             icon: '💰', color: '#4ADE80', group: 'liquid',     isLiability: false, isCredit: false, isInvestment: false },
+  money_market:     { label: 'Money Market',        icon: '💵', color: '#34D399', group: 'liquid',     isLiability: false, isCredit: false, isInvestment: false },
+  cd:               { label: 'CD',                  icon: '🔒', color: '#6EE7B7', group: 'liquid',     isLiability: false, isCredit: false, isInvestment: false },
+  // Liability
+  credit:           { label: 'Credit Card',         icon: '💳', color: '#F87171', group: 'liability',  isLiability: true,  isCredit: true,  isInvestment: false },
+  store_credit:     { label: 'Store Credit',        icon: '🛍️', color: '#FB7185', group: 'liability',  isLiability: true,  isCredit: true,  isInvestment: false },
+  mortgage:         { label: 'Mortgage',            icon: '🏠', color: '#F59E0B', group: 'liability',  isLiability: true,  isCredit: false, isInvestment: false },
+  auto_loan:        { label: 'Auto Loan',           icon: '🚗', color: '#FBBF24', group: 'liability',  isLiability: true,  isCredit: false, isInvestment: false },
+  personal_loan:    { label: 'Personal Loan',       icon: '📋', color: '#FCD34D', group: 'liability',  isLiability: true,  isCredit: false, isInvestment: false },
+  student_loan:     { label: 'Student Loan',        icon: '🎓', color: '#FDE68A', group: 'liability',  isLiability: true,  isCredit: false, isInvestment: false },
+  // Retirement
+  roth_ira:         { label: 'Roth IRA',            icon: '📈', color: '#D4AF37', group: 'retirement', isLiability: false, isCredit: false, isInvestment: true  },
+  traditional_ira:  { label: 'Traditional IRA',     icon: '📊', color: '#C9A227', group: 'retirement', isLiability: false, isCredit: false, isInvestment: true  },
+  '401k':           { label: '401k',                icon: '🏛️', color: '#A78BFA', group: 'retirement', isLiability: false, isCredit: false, isInvestment: true  },
+  '403b':           { label: '403b',                icon: '🎓', color: '#8B5CF6', group: 'retirement', isLiability: false, isCredit: false, isInvestment: true  },
+  hsa:              { label: 'HSA',                 icon: '🏥', color: '#2DD4BF', group: 'retirement', isLiability: false, isCredit: false, isInvestment: true  },
+  // Investment
+  brokerage:        { label: 'Brokerage',           icon: '💼', color: '#38BDF8', group: 'investment', isLiability: false, isCredit: false, isInvestment: true  },
+  reit:             { label: 'REIT',                icon: '🏘️', color: '#FB923C', group: 'investment', isLiability: false, isCredit: false, isInvestment: true  },
+  crypto:           { label: 'Crypto',              icon: '🪙', color: '#F59E0B', group: 'investment', isLiability: false, isCredit: false, isInvestment: true  },
 };
 
 const baseCC = (extra) => ({
@@ -124,6 +139,22 @@ export const DEFAULT_ACCOUNTS = [
     name: 'Jessica 401k',
     owner: 'Jessica',
     type: '401k',
+    balance: 0,
+    monthlyContribution: 0,
+    targetGoal: 0,
+    ytdContributions: 0,
+    totalContributed: 0,
+    annualTarget: 0,
+    lastUpdated: null,
+    history: [],
+  },
+
+  // ── Savings ───────────────────────────────────────────────
+  {
+    id: 'ameriprise_savings_vadim',
+    name: 'Ameriprise Savings',
+    owner: 'Vadim',
+    type: 'savings',
     balance: 0,
     monthlyContribution: 0,
     targetGoal: 0,

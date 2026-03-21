@@ -14,6 +14,7 @@ const MORE_ITEMS = [
   { id: 'expenses',    icon: '📉', label: 'Expenses'    },
   { id: 'cashflow',    icon: '📈', label: 'Cash Flow'   },
   { id: 'savings',     icon: '🏦', label: 'Savings'     },
+  { id: 'moneyflow',   icon: '🔀', label: 'Money Flow'  },
   { id: 'investments', icon: '💼', label: 'Investments' },
   { id: 'debt',        icon: '🔴', label: 'Debt'        },
   { id: 'recurring',   icon: '🔄', label: 'Recurring'   },

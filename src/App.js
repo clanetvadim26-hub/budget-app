@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useConfirm } from './components/ConfirmModal';
 import './App.css';
 import './styles/new-features.css';
 import { format } from 'date-fns';
@@ -24,6 +25,7 @@ import AccountsPanel from './components/panels/AccountsPanel';
 import InvestmentsPanel from './components/panels/InvestmentsPanel';
 import DebtPanel from './components/panels/DebtPanel';
 import CalendarPanel from './components/panels/CalendarPanel';
+import MoneyFlowPanel from './components/panels/MoneyFlowPanel';
 import PendingConfirmationCard from './components/PendingConfirmationCard';
 import UpcomingExpensesCard from './components/UpcomingExpensesCard';
 import HealthScoreGauge, { calculateHealthScore } from './components/HealthScoreGauge';
@@ -176,6 +178,8 @@ export default function App() {
         return <DebtPanel />;
       case 'calendar':
         return <CalendarPanel />;
+      case 'moneyflow':
+        return <MoneyFlowPanel />;
       case 'recurring':
         return <RecurringPanel />;
       case 'add-expense':
@@ -260,6 +264,12 @@ export default function App() {
 function RecentItem({ item, type, onDelete }) {
   const isIncome = type === 'income';
   const sourceIcon = item.source === 'Vadim' ? '👨' : item.source === 'Jessica' ? '👩' : '🌐';
+  const confirm = useConfirm();
+  const handleDelete = async () => {
+    const label = isIncome ? `${item.source} – ${item.description || item.source}` : `${item.category}${item.description ? ` – ${item.description}` : ''}`;
+    const ok = await confirm(label);
+    if (ok) onDelete();
+  };
   return (
     <div className="recent-item">
       <span className="recent-icon">{isIncome ? sourceIcon : '💸'}</span>
@@ -271,7 +281,7 @@ function RecentItem({ item, type, onDelete }) {
       <span className={isIncome ? 'recent-amount positive' : 'recent-amount negative'}>
         {isIncome ? '+' : '-'}${Number(item.amount).toLocaleString()}
       </span>
-      <button className="delete-btn" onClick={onDelete} title="Delete">×</button>
+      <button className="delete-btn" onClick={handleDelete} title="Delete">×</button>
     </div>
   );
 }

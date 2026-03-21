@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { id: 'cashflow',    label: 'Cash Flow',   icon: '📈' },
   { id: 'savings',     label: 'Savings',     icon: '🏦' },
   { id: 'accounts',    label: 'Accounts',    icon: '💳' },
+  { id: 'moneyflow',   label: 'Money Flow',  icon: '🔀' },
   { id: 'investments', label: 'Investments', icon: '💼' },
   { id: 'debt',        label: 'Debt',        icon: '🔴' },
   { id: 'recurring',   label: 'Recurring',   icon: '🔄' },

@@ -1,4 +1,73 @@
 /* ========================
+   CONFIRM MODAL
+   ======================== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 22, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.confirm-card {
+  background: #0F1629;
+  border: 1px solid #1E2A45;
+  border-radius: 16px;
+  padding: 32px 28px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  text-align: center;
+}
+.confirm-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #E2E8F0;
+  margin-bottom: 12px;
+}
+.confirm-item-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #D4AF37;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+.confirm-message {
+  font-size: 13px;
+  color: #64748B;
+  margin-bottom: 28px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.confirm-btn {
+  flex: 1;
+  padding: 11px 0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 2px solid transparent;
+}
+.confirm-btn.cancel {
+  background: transparent;
+  border-color: #1E2A45;
+  color: #94A3B8;
+}
+.confirm-btn.cancel:hover { border-color: #60A5FA; color: #60A5FA; }
+.confirm-btn.delete {
+  background: #EF4444;
+  color: #fff;
+}
+.confirm-btn.delete:hover { background: #DC2626; }
+
+/* ========================
    CREDIT CARD UTILIZATION
    ======================== */
 .util-wrap { margin-bottom: 12px; }
@@ -900,3 +969,304 @@ input, select, textarea {
   flex-shrink: 0;
 }
 .pwa-dismiss-x:hover { background: #1E293B; color: #94A3B8; }
+
+/* ========================
+   ADD ACCOUNT FORM — DYNAMIC
+   ======================== */
+.add-account-panel {}
+.add-account-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #D4AF37;
+  margin: 18px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.color-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.15s;
+}
+.color-swatch:hover { transform: scale(1.2); }
+.color-swatch.selected { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 0 2px #D4AF37; }
+.color-custom-input {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #1E2A45;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+.connection-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.conn-account-select { flex: 2; min-width: 130px; }
+.conn-flow-select    { flex: 1.5; min-width: 110px; }
+.conn-amount-input   { flex: 1; min-width: 80px; }
+.conn-label-input    { flex: 1.5; min-width: 100px; }
+
+/* ========================
+   MONEY FLOW MAP
+   ======================== */
+.flow-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 500px;
+  background: #080D1A;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #1E2A45;
+}
+.flow-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #0A0F1E;
+  border-bottom: 1px solid #1E2A45;
+  flex-shrink: 0;
+}
+.flow-toolbar-left, .flow-toolbar-right { display: flex; align-items: center; gap: 8px; }
+.flow-view-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid #1E2A45;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.flow-view-btn.active { background: #D4AF3722; border-color: #D4AF37; color: #D4AF37; }
+.flow-zoom-btn {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  background: #0F1629;
+  border: 1px solid #1E2A45;
+  color: #94A3B8;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.flow-zoom-btn:hover { background: #1E2A45; color: #E2E8F0; }
+.flow-zoom-label { font-size: 12px; color: #64748B; min-width: 36px; text-align: center; }
+.flow-reset-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid #1E2A45;
+  color: #64748B;
+  font-size: 12px;
+  cursor: pointer;
+}
+.flow-reset-btn:hover { border-color: #60A5FA; color: #60A5FA; }
+.flow-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.flow-canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+.flow-svg {
+  display: block;
+}
+/* Arrow animation */
+@keyframes flowPulse {
+  from { stroke-dashoffset: 20; }
+  to   { stroke-dashoffset: 0; }
+}
+.flow-arrow-animated {
+  animation: flowPulse 1.2s linear infinite;
+}
+/* Sidebar */
+.flow-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: #0A0F1E;
+  border-left: 1px solid #1E2A45;
+  padding: 16px;
+  overflow-y: auto;
+}
+.flow-sidebar-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748B;
+  margin-bottom: 10px;
+}
+.flow-sidebar-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.fss-label { font-size: 11px; color: #64748B; }
+.fss-value { font-size: 12px; font-weight: 700; }
+.fss-value.positive { color: #4ADE80; }
+.fss-value.negative { color: #F87171; }
+.flow-sidebar-divider { border-top: 1px solid #1E2A45; margin: 12px 0; }
+.fss-hint { font-size: 11px; color: #475569; line-height: 1.5; margin-top: 8px; }
+/* Legend */
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid #1E2A45;
+  background: #0A0F1E;
+  flex-shrink: 0;
+}
+.flow-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #64748B; }
+.flow-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* List view */
+.flow-list-view { flex: 1; overflow-y: auto; padding: 16px; }
+.flow-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #0F1629;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.flow-from, .flow-to { color: #E2E8F0; font-weight: 600; }
+.flow-arrow-label { font-size: 12px; font-weight: 700; }
+.flow-amount { margin-left: auto; font-weight: 700; font-size: 13px; }
+
+/* ========================
+   REFINANCE SCENARIOS
+   ======================== */
+.refinance-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #1E2A45;
+}
+.refinance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.refinance-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #D4AF37;
+}
+.scenario-form {
+  background: #080D1A;
+  border: 1px solid #1E2A45;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.scenario-auto-calc {
+  font-size: 11px;
+  color: #D4AF37;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.scenario-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.scenario-card {
+  background: #080D1A;
+  border: 1px solid #1E2A45;
+  border-radius: 12px;
+  padding: 14px;
+}
+.scenario-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.scenario-name { font-size: 13px; font-weight: 700; }
+.scenario-card-actions { display: flex; align-items: center; gap: 6px; }
+.scenario-best-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: #D4AF3722;
+  color: #D4AF37;
+  border: 1px solid #D4AF3755;
+  border-radius: 20px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.scenario-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.scenario-stat {}
+.ss-label { display: block; font-size: 10px; color: #64748B; margin-bottom: 2px; }
+.ss-val { font-size: 12px; font-weight: 700; color: #E2E8F0; }
+.ss-val.positive { color: #4ADE80; }
+.ss-val.negative { color: #F87171; }
+.scenario-notes {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #64748B;
+  font-style: italic;
+}
+.refinance-chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+.scenario-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 16px;
+}
+.scenario-compare-table th {
+  text-align: left;
+  color: #64748B;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  border-bottom: 1px solid #1E2A45;
+}
+.scenario-compare-table td {
+  padding: 8px 10px;
+  color: #CBD5E1;
+  border-bottom: 1px solid #0F1629;
+}
+.scenario-compare-table tr:hover td { background: #0A0F1E; }
+.scenario-compare-current td { color: #94A3B8; font-style: italic; }
+.scenario-compare-table .positive { color: #4ADE80; }
+.scenario-compare-table .negative { color: #F87171; }

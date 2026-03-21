@@ -15,6 +15,7 @@ import {
   generateCombinedDebtTimeline, LOAN_TYPE_META,
 } from '../../utils/loanCalculations';
 import AddLoanForm from '../forms/AddLoanForm';
+import { useConfirm } from '../ConfirmModal';
 
 const CARD_COLORS = ['#F87171', '#FB923C', '#FACC15', '#4ADE80', '#60A5FA', '#A78BFA', '#F472B6'];
 const LOAN_COLORS = ['#38BDF8', '#818CF8', '#34D399', '#F472B6', '#FB923C'];
@@ -273,8 +274,275 @@ function AmortizationSchedule({ loan }) {
   );
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function calcPayment(balance, aprPct, termMonths) {
+  if (!balance || balance <= 0 || !termMonths) return 0;
+  const r = (aprPct || 0) / 100 / 12;
+  if (r === 0) return balance / termMonths;
+  return (balance * r * Math.pow(1 + r, termMonths)) / (Math.pow(1 + r, termMonths) - 1);
+}
+
+const SCENARIO_COLORS = ['#60A5FA', '#4ADE80', '#F472B6', '#FB923C', '#A78BFA', '#34D399'];
+
+// ── Refinance Scenario Form ──────────────────────────────────────────────────
+function ScenarioForm({ onSave, onCancel, balance }) {
+  const [form, setForm] = useState({ name: '', newApr: '', termMonths: '', notes: '' });
+  const f = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const autoPayment = form.newApr !== '' && form.termMonths
+    ? calcPayment(balance, Number(form.newApr), Number(form.termMonths))
+    : null;
+
+  return (
+    <div className="scenario-form">
+      <div className="form-row">
+        <div className="form-group">
+          <label>Scenario Name</label>
+          <input placeholder="e.g. Refi at 5%" value={form.name} onChange={(e) => f('name', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>New APR (%)</label>
+          <input type="number" min="0" step="0.01" placeholder="e.g. 5.25" value={form.newApr} onChange={(e) => f('newApr', e.target.value)} />
+        </div>
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label>Term (months)</label>
+          <input type="number" min="1" step="1" placeholder="e.g. 60" value={form.termMonths} onChange={(e) => f('termMonths', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Monthly Payment ($)
+            {autoPayment && (
+              <span className="scenario-auto-calc"> auto: {formatCurrency(autoPayment)}</span>
+            )}
+          </label>
+          <input
+            type="number" min="0" step="0.01"
+            placeholder={autoPayment ? autoPayment.toFixed(2) : '0.00'}
+            value={form.monthlyPayment || ''}
+            onChange={(e) => f('monthlyPayment', e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Notes (optional)</label>
+        <input placeholder="e.g. Credit union offer" value={form.notes} onChange={(e) => f('notes', e.target.value)} />
+      </div>
+      <div className="form-actions">
+        <button
+          className="btn-primary"
+          disabled={!form.name || !form.newApr || !form.termMonths}
+          onClick={() => {
+            const payment = form.monthlyPayment
+              ? Number(form.monthlyPayment)
+              : calcPayment(balance, Number(form.newApr), Number(form.termMonths));
+            onSave({
+              id: Date.now().toString(),
+              name: form.name,
+              newApr: Number(form.newApr),
+              termMonths: Number(form.termMonths),
+              monthlyPayment: payment,
+              notes: form.notes,
+            });
+          }}
+        >
+          Add Scenario
+        </button>
+        <button className="btn-cancel-lg" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Refinance Comparison Chart ───────────────────────────────────────────────
+function RefinanceChart({ loan, scenarios }) {
+  const maxMonths = Math.max(
+    loanPayoffSummary(loan.balance, loan.apr, loan.monthlyPayment).months,
+    ...scenarios.map((s) => loanPayoffSummary(loan.balance, s.newApr, s.monthlyPayment).months),
+    1
+  );
+  const cap = Math.min(isFinite(maxMonths) ? maxMonths : 120, 360);
+  const step = Math.max(1, Math.floor(cap / 36));
+
+  const data = [];
+  for (let m = 0; m <= cap; m += step) {
+    const row = { month: m };
+    // Current
+    const curSchedule = generateAmortizationSchedule(loan.balance, loan.apr, loan.monthlyPayment);
+    row.current = curSchedule[m - 1]?.remainingBalance ?? (m === 0 ? loan.balance : 0);
+    // Scenarios
+    scenarios.forEach((s) => {
+      const sch = generateAmortizationSchedule(loan.balance, s.newApr, s.monthlyPayment);
+      row[s.id] = sch[m - 1]?.remainingBalance ?? (m === 0 ? loan.balance : 0);
+    });
+    data.push(row);
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <LineChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+        <XAxis dataKey="month" tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} label={{ value: 'Months', position: 'insideBottom', fill: '#64748B', fontSize: 10 }} />
+        <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
+        <Tooltip formatter={(v) => formatCurrency(v)} labelFormatter={(l) => `Month ${l}`} contentStyle={{ background: '#0F1629', border: '1px solid #1E2A45', borderRadius: 8, fontSize: 12 }} />
+        <Legend wrapperStyle={{ fontSize: 11, color: '#94A3B8' }} />
+        <Line type="monotone" dataKey="current" stroke="#F87171" strokeWidth={2} dot={false} name="Current" />
+        {scenarios.map((s, i) => (
+          <Line key={s.id} type="monotone" dataKey={s.id} stroke={SCENARIO_COLORS[i % SCENARIO_COLORS.length]} strokeWidth={2} dot={false} name={s.name} />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ── Refinance Scenarios Section ──────────────────────────────────────────────
+function RefinanceScenariosSection({ loan, onUpdateLoan }) {
+  const [showForm, setShowForm] = useState(false);
+  const confirm = useConfirm();
+  const scenarios = loan.scenarios || [];
+
+  const currentSummary = useMemo(
+    () => loanPayoffSummary(loan.balance, loan.apr, loan.monthlyPayment),
+    [loan.balance, loan.apr, loan.monthlyPayment]
+  );
+
+  const addScenario = (scenario) => {
+    onUpdateLoan({ ...loan, scenarios: [...scenarios, scenario] });
+    setShowForm(false);
+  };
+
+  const deleteScenario = async (id, name) => {
+    const ok = await confirm(name);
+    if (ok) onUpdateLoan({ ...loan, scenarios: scenarios.filter((s) => s.id !== id) });
+  };
+
+  // Determine best option (lowest total interest)
+  const scenarioStats = scenarios.map((s) => ({
+    ...s,
+    ...loanPayoffSummary(loan.balance, s.newApr, s.monthlyPayment),
+  }));
+  const bestId = scenarioStats.length > 0
+    ? scenarioStats.reduce((best, s) =>
+        (s.totalInterest < best.totalInterest ? s : best), scenarioStats[0]).id
+    : null;
+
+  return (
+    <div className="refinance-section">
+      <div className="refinance-header">
+        <div className="refinance-title">Refinance Scenarios</div>
+        <button className="btn-add-small" onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Cancel' : '+ Add Scenario'}
+        </button>
+      </div>
+
+      {showForm && <ScenarioForm balance={loan.balance} onSave={addScenario} onCancel={() => setShowForm(false)} />}
+
+      {/* Scenario cards */}
+      {scenarioStats.length === 0 && !showForm && (
+        <div className="empty-state" style={{ fontSize: 12, padding: '10px 0' }}>
+          Add a refinance scenario to compare rates and terms.
+        </div>
+      )}
+      <div className="scenario-cards">
+        {scenarioStats.map((s, i) => {
+          const color = SCENARIO_COLORS[i % SCENARIO_COLORS.length];
+          const savings = currentSummary.totalInterest - s.totalInterest;
+          const isBest = s.id === bestId && scenarioStats.length > 1;
+          return (
+            <div key={s.id} className="scenario-card" style={{ borderColor: color + '55' }}>
+              <div className="scenario-card-header">
+                <span className="scenario-name" style={{ color }}>{s.name}</span>
+                <div className="scenario-card-actions">
+                  {isBest && <span className="scenario-best-badge">Best Option</span>}
+                  <button className="btn-icon danger" onClick={() => deleteScenario(s.id, s.name)}>🗑️</button>
+                </div>
+              </div>
+              <div className="scenario-stats">
+                <div className="scenario-stat">
+                  <span className="ss-label">New APR</span>
+                  <span className="ss-val" style={{ color }}>{s.newApr}%</span>
+                </div>
+                <div className="scenario-stat">
+                  <span className="ss-label">Term</span>
+                  <span className="ss-val">{s.termMonths} mo</span>
+                </div>
+                <div className="scenario-stat">
+                  <span className="ss-label">Payment</span>
+                  <span className="ss-val" style={{ color: '#60A5FA' }}>{formatCurrency(s.monthlyPayment)}/mo</span>
+                </div>
+                <div className="scenario-stat">
+                  <span className="ss-label">Total Interest</span>
+                  <span className="ss-val negative">{isFinite(s.totalInterest) ? formatCurrency(s.totalInterest) : '∞'}</span>
+                </div>
+                <div className="scenario-stat">
+                  <span className="ss-label">vs Current</span>
+                  <span className={`ss-val ${savings >= 0 ? 'positive' : 'negative'}`}>
+                    {savings >= 0 ? `-${formatCurrency(savings)}` : `+${formatCurrency(-savings)}`}
+                  </span>
+                </div>
+                <div className="scenario-stat">
+                  <span className="ss-label">Payoff</span>
+                  <span className="ss-val">{isFinite(s.months) ? payoffDate(s.months) : '—'}</span>
+                </div>
+              </div>
+              {s.notes && <div className="scenario-notes">{s.notes}</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Comparison chart */}
+      {scenarios.length > 0 && (
+        <>
+          <div className="refinance-chart-title">Balance Comparison</div>
+          <RefinanceChart loan={loan} scenarios={scenarios} />
+          {/* Comparison table */}
+          <table className="scenario-compare-table">
+            <thead>
+              <tr>
+                <th>Scenario</th>
+                <th>APR</th>
+                <th>Payment</th>
+                <th>Months</th>
+                <th>Total Interest</th>
+                <th>Savings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="scenario-compare-current">
+                <td>Current</td>
+                <td>{loan.apr || 0}%</td>
+                <td>{formatCurrency(loan.monthlyPayment)}</td>
+                <td>{isFinite(currentSummary.months) ? currentSummary.months : '∞'}</td>
+                <td className="negative">{isFinite(currentSummary.totalInterest) ? formatCurrency(currentSummary.totalInterest) : '∞'}</td>
+                <td>—</td>
+              </tr>
+              {scenarioStats.map((s, i) => {
+                const savings = currentSummary.totalInterest - s.totalInterest;
+                const color = SCENARIO_COLORS[i % SCENARIO_COLORS.length];
+                return (
+                  <tr key={s.id} style={{ borderLeft: `3px solid ${color}` }}>
+                    <td style={{ color }}>{s.name}{s.id === bestId && scenarioStats.length > 1 ? ' ★' : ''}</td>
+                    <td>{s.newApr}%</td>
+                    <td>{formatCurrency(s.monthlyPayment)}</td>
+                    <td>{isFinite(s.months) ? s.months : '∞'}</td>
+                    <td className="negative">{isFinite(s.totalInterest) ? formatCurrency(s.totalInterest) : '∞'}</td>
+                    <td className={savings >= 0 ? 'positive' : 'negative'}>
+                      {savings >= 0 ? `-${formatCurrency(savings)}` : `+${formatCurrency(-savings)}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Loan Card ──────────────────────────────────────────────────────────────
-function LoanCard({ loan, expanded, onToggleExpand, onEdit, onDelete }) {
+function LoanCard({ loan, expanded, onToggleExpand, onEdit, onDelete, onUpdate }) {
   const today = new Date();
   const meta  = LOAN_TYPE_META[loan.type] || LOAN_TYPE_META.other;
   const ownerColor = OWNER_COLORS[loan.owner] || '#94A3B8';
@@ -384,11 +652,16 @@ function LoanCard({ loan, expanded, onToggleExpand, onEdit, onDelete }) {
 
       {/* Expand button */}
       <button className="loan-expand-btn" onClick={onToggleExpand}>
-        {expanded ? '▲ Collapse Schedule' : '▼ View Full Amortization Schedule'}
+        {expanded ? '▲ Collapse Details' : '▼ Amortization Schedule & Refinance Scenarios'}
       </button>
 
-      {/* Amortization schedule */}
-      {expanded && <AmortizationSchedule loan={loan} />}
+      {/* Expanded content */}
+      {expanded && (
+        <>
+          <AmortizationSchedule loan={loan} />
+          <RefinanceScenariosSection loan={loan} onUpdateLoan={onUpdate} />
+        </>
+      )}
     </div>
   );
 }
@@ -398,6 +671,7 @@ function LoansSection({ loans, setLoans }) {
   const [showForm,    setShowForm]    = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [expandedId,  setExpandedId]  = useState(null);
+  const confirm = useConfirm();
 
   const handleAdd = (loan) => {
     if (editingLoan) {
@@ -414,8 +688,9 @@ function LoansSection({ loans, setLoans }) {
     setShowForm(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Delete this loan?')) {
+  const handleDelete = async (id, name) => {
+    const ok = await confirm(name);
+    if (ok) {
       setLoans((prev) => prev.filter((l) => l.id !== id));
       if (expandedId === id) setExpandedId(null);
     }
@@ -448,7 +723,8 @@ function LoansSection({ loans, setLoans }) {
               expanded={expandedId === loan.id}
               onToggleExpand={() => setExpandedId(expandedId === loan.id ? null : loan.id)}
               onEdit={() => handleEdit(loan)}
-              onDelete={() => handleDelete(loan.id)}
+              onDelete={() => handleDelete(loan.id, loan.name)}
+              onUpdate={(updated) => setLoans((prev) => prev.map((l) => l.id === updated.id ? updated : l))}
             />
           ))}
         </div>

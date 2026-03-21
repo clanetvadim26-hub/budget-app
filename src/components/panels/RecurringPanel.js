@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from '../ConfirmModal';
 import { format } from 'date-fns';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { FIXED_CATEGORIES, VARIABLE_CATEGORIES } from '../../data/categories';
@@ -172,12 +173,20 @@ export default function RecurringPanel() {
     }
   };
 
+  const confirm = useConfirm();
+
   const toggleIncome = (id) =>
     setRecurringIncomes((p) => p.map((i) => (i.id === id ? { ...i, active: !i.active } : i)));
-  const deleteIncome = (id) => setRecurringIncomes((p) => p.filter((i) => i.id !== id));
+  const deleteIncome = async (id, name) => {
+    const ok = await confirm(name);
+    if (ok) setRecurringIncomes((p) => p.filter((i) => i.id !== id));
+  };
   const toggleExpense = (id) =>
     setRecurringExpenses((p) => p.map((e) => (e.id === id ? { ...e, active: !e.active } : e)));
-  const deleteExpense = (id) => setRecurringExpenses((p) => p.filter((e) => e.id !== id));
+  const deleteExpense = async (id, name) => {
+    const ok = await confirm(name);
+    if (ok) setRecurringExpenses((p) => p.filter((e) => e.id !== id));
+  };
 
   const projectedMonthlyIncome = monthlyProjection(recurringIncomes);
   const projectedMonthlyExpenses = monthlyFixedCost(recurringExpenses);
@@ -248,7 +257,7 @@ export default function RecurringPanel() {
                       {inc.active ? 'Active' : 'Paused'}
                     </button>
                     <button className="btn-icon" onClick={() => { setEditingIncome(inc); setShowIncomeForm(false); }}>✏️</button>
-                    <button className="btn-icon danger" onClick={() => deleteIncome(inc.id)}>🗑️</button>
+                    <button className="btn-icon danger" onClick={() => deleteIncome(inc.id, inc.name)}>🗑️</button>
                   </div>
                 </>
               )}
@@ -297,7 +306,7 @@ export default function RecurringPanel() {
                         {exp.active ? 'Active' : 'Paused'}
                       </button>
                       <button className="btn-icon" onClick={() => { setEditingExpense(exp); setShowExpenseForm(false); }}>✏️</button>
-                      <button className="btn-icon danger" onClick={() => deleteExpense(exp.id)}>🗑️</button>
+                      <button className="btn-icon danger" onClick={() => deleteExpense(exp.id, exp.name)}>🗑️</button>
                     </div>
                   </>
                 )}

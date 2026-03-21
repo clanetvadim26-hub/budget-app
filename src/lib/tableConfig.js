@@ -86,6 +86,8 @@ const accountFromRow = (r) => ({
   name:               r.name,
   owner:              r.owner,
   type:               r.type,
+  institution:        r.institution        || '',
+  color:              r.color              || '',
   balance:            num(r.balance),
   targetGoal:         num(r.target_goal),
   monthlyContribution:num(r.monthly_contribution),
@@ -99,12 +101,15 @@ const accountFromRow = (r) => ({
   minPayment:         numOrNull(r.minimum_payment),
   plannedPayment:     numOrNull(r.planned_payment),
   dueDay:             r.due_day || null,
+  connections:        r.connections || [],
 });
 const accountToRow = (item) => ({
   id:                  item.id,
   name:                item.name,
   owner:               item.owner,
   type:                item.type,
+  institution:         item.institution         || null,
+  color:               item.color               || null,
   balance:             item.balance            || 0,
   target_goal:         item.targetGoal         || 0,
   monthly_contribution:item.monthlyContribution|| 0,
@@ -118,6 +123,7 @@ const accountToRow = (item) => ({
   minimum_payment:     item.minPayment   != null ? item.minPayment   : null,
   planned_payment:     item.plannedPayment != null ? item.plannedPayment : null,
   due_day:             item.dueDay || null,
+  connections:         item.connections || [],
 });
 
 // Loans
@@ -134,6 +140,7 @@ const loanFromRow = (r) => ({
   startDate:      r.start_date || null,
   termMonths:     r.term_months || null,
   notes:          r.notes || '',
+  scenarios:      r.scenarios || [],
 });
 const loanToRow = (item) => ({
   id:                item.id,
@@ -148,6 +155,7 @@ const loanToRow = (item) => ({
   start_date:        item.startDate        || null,
   term_months:       item.termMonths       || null,
   notes:             item.notes            || null,
+  scenarios:         item.scenarios        || [],
 });
 
 // Savings goals (object ↔ rows)

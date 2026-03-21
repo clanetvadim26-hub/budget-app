@@ -5,8 +5,22 @@ import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/ac
 import { formatCurrency } from '../../utils/calculations';
 import { monthlyInterest } from '../../utils/debtCalculations';
 import NetWorthChart from '../charts/NetWorthChart';
+import { useConfirm } from '../ConfirmModal';
 
-const TYPE_OPTIONS = ['checking', 'savings', 'credit', 'roth_ira', '401k', 'brokerage', 'reit'];
+const TYPE_GROUPS = {
+  'Checking & Savings': ['checking', 'savings', 'money_market', 'cd'],
+  'Credit & Loans':     ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'],
+  'Retirement':         ['roth_ira', 'traditional_ira', '401k', '403b', 'hsa'],
+  'Investment':         ['brokerage', 'reit', 'crypto'],
+};
+const FLOW_TYPES = [
+  { value: 'income',      label: 'Income deposit',     color: '#D4AF37' },
+  { value: 'bill',        label: 'Bill / expense pay',  color: '#F87171' },
+  { value: 'cc_payment',  label: 'CC payment',          color: '#FB923C' },
+  { value: 'loan',        label: 'Loan payment',        color: '#60A5FA' },
+  { value: 'investment',  label: 'Investment transfer', color: '#4ADE80' },
+  { value: 'transfer',    label: 'Transfer',            color: '#A78BFA' },
+];
 
 function UtilizationBar({ balance, creditLimit }) {
   if (!creditLimit || creditLimit <= 0) return null;
@@ -112,7 +126,7 @@ function AccountCard({ account, onSave, onDelete }) {
       {!editing ? (
         <div className="account-card-actions">
           <button className="btn-edit-account" onClick={() => setEditing(true)}>Edit</button>
-          <button className="btn-icon danger" onClick={() => onDelete(account.id)}>🗑️</button>
+          <button className="btn-icon danger" onClick={() => onDelete(account.id, account.name)}>🗑️</button>
         </div>
       ) : (
         <div className="account-edit-form">
@@ -196,27 +210,75 @@ function AccountCard({ account, onSave, onDelete }) {
   );
 }
 
-function AddAccountForm({ onAdd, onCancel }) {
-  const [form, setForm] = useState({ name: '', owner: 'Vadim', type: 'checking', balance: '', monthlyContribution: '', targetGoal: '' });
+const PRESET_COLORS = ['#60A5FA','#4ADE80','#F87171','#D4AF37','#A78BFA','#38BDF8','#FB923C','#F472B6','#34D399','#FBBF24'];
+
+function AddAccountForm({ onAdd, onCancel, allAccounts }) {
+  const [form, setForm] = useState({
+    name: '', owner: 'Vadim', type: 'checking', institution: '', color: '',
+    balance: '', creditLimit: '', apr: '', minPayment: '', plannedPayment: '', dueDay: '',
+    monthlyContribution: '', targetGoal: '', ytdContributions: '', annualTarget: '',
+    connections: [],
+  });
   const f = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const meta = ACCOUNT_TYPE_META[form.type] || {};
+
+  const addConnection = () =>
+    f('connections', [...form.connections, { toAccountId: '', label: '', amount: '', flowType: 'transfer' }]);
+  const updateConn = (i, k, v) =>
+    f('connections', form.connections.map((c, idx) => idx === i ? { ...c, [k]: v } : c));
+  const removeConn = (i) =>
+    f('connections', form.connections.filter((_, idx) => idx !== i));
+
+  const handleAdd = () => {
+    if (!form.name) return;
+    onAdd({
+      ...form,
+      balance:             Number(form.balance)             || 0,
+      creditLimit:         Number(form.creditLimit)         || 0,
+      apr:                 Number(form.apr)                 || 0,
+      minPayment:          Number(form.minPayment)          || 0,
+      plannedPayment:      Number(form.plannedPayment)      || 0,
+      dueDay:              Number(form.dueDay)              || 1,
+      monthlyContribution: Number(form.monthlyContribution) || 0,
+      targetGoal:          Number(form.targetGoal)          || 0,
+      ytdContributions:    Number(form.ytdContributions)    || 0,
+      annualTarget:        Number(form.annualTarget)        || 0,
+      connections: form.connections
+        .filter((c) => c.toAccountId)
+        .map((c) => ({ ...c, amount: Number(c.amount) || 0 })),
+    });
+  };
 
   return (
-    <div className="panel" style={{ marginBottom: 20 }}>
+    <div className="panel add-account-panel" style={{ marginBottom: 20 }}>
       <div className="panel-header"><h2>Add New Account</h2></div>
       <div className="recurring-form">
+
+        {/* ── Basic Info ── */}
+        <div className="add-account-section-label">Basic Info</div>
         <div className="form-row">
           <div className="form-group">
-            <label>Account Name</label>
+            <label>Account Name *</label>
             <input placeholder="e.g. Ally Savings" value={form.name} onChange={(e) => f('name', e.target.value)} />
           </div>
           <div className="form-group">
-            <label>Type</label>
-            <select value={form.type} onChange={(e) => f('type', e.target.value)}>
-              {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{ACCOUNT_TYPE_META[t]?.icon} {ACCOUNT_TYPE_META[t]?.label || t}</option>)}
-            </select>
+            <label>Institution</label>
+            <input placeholder="e.g. Ally Bank" value={form.institution} onChange={(e) => f('institution', e.target.value)} />
           </div>
         </div>
         <div className="form-row">
+          <div className="form-group">
+            <label>Type</label>
+            <select value={form.type} onChange={(e) => f('type', e.target.value)}>
+              {Object.entries(TYPE_GROUPS).map(([group, types]) => (
+                <optgroup key={group} label={group}>
+                  {types.map((t) => (
+                    <option key={t} value={t}>{ACCOUNT_TYPE_META[t]?.icon} {ACCOUNT_TYPE_META[t]?.label || t}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
           <div className="form-group">
             <label>Owner</label>
             <div className="source-buttons">
@@ -227,25 +289,149 @@ function AddAccountForm({ onAdd, onCancel }) {
               ))}
             </div>
           </div>
-          <div className="form-group">
-            <label>Current Balance ($)</label>
-            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.balance} onChange={(e) => f('balance', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Color (optional — overrides type default)</label>
+          <div className="color-picker-row">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`color-swatch ${form.color === c ? 'selected' : ''}`}
+                style={{ background: c }}
+                onClick={() => f('color', form.color === c ? '' : c)}
+                title={c}
+              />
+            ))}
+            <input
+              type="color"
+              className="color-custom-input"
+              value={form.color || (meta.color || '#60A5FA')}
+              onChange={(e) => f('color', e.target.value)}
+              title="Custom color"
+            />
           </div>
         </div>
+
+        {/* ── Balance Info ── */}
+        <div className="add-account-section-label">Balance Info</div>
         <div className="form-row">
           <div className="form-group">
-            <label>Monthly Contribution ($)</label>
-            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.monthlyContribution} onChange={(e) => f('monthlyContribution', e.target.value)} />
+            <label>{meta.isLiability ? 'Current Balance Owed ($)' : 'Current Balance ($)'}</label>
+            <input type="number" min="0" step="0.01" placeholder="0.00" value={form.balance} onChange={(e) => f('balance', e.target.value)} />
           </div>
-          <div className="form-group">
-            <label>Target Goal ($)</label>
-            <input type="number" min="0" step="1" placeholder="Optional" value={form.targetGoal} onChange={(e) => f('targetGoal', e.target.value)} />
-          </div>
+          {!meta.isLiability && (
+            <div className="form-group">
+              <label>Target Goal ($)</label>
+              <input type="number" min="0" step="1" placeholder="Optional" value={form.targetGoal} onChange={(e) => f('targetGoal', e.target.value)} />
+            </div>
+          )}
         </div>
+        {!meta.isLiability && (
+          <div className="form-row">
+            <div className="form-group">
+              <label>Monthly Contribution ($)</label>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={form.monthlyContribution} onChange={(e) => f('monthlyContribution', e.target.value)} />
+            </div>
+            {meta.isInvestment && (
+              <div className="form-group">
+                <label>Annual Target ($)</label>
+                <input type="number" min="0" step="1" placeholder="e.g. 7000" value={form.annualTarget} onChange={(e) => f('annualTarget', e.target.value)} />
+              </div>
+            )}
+          </div>
+        )}
+        {meta.isInvestment && (
+          <div className="form-row">
+            <div className="form-group">
+              <label>YTD Contributions ($)</label>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={form.ytdContributions} onChange={(e) => f('ytdContributions', e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Credit / Loan Fields ── */}
+        {meta.isCredit && (
+          <>
+            <div className="add-account-section-label">Credit Card Details</div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Credit Limit ($)</label>
+                <input type="number" min="0" step="1" placeholder="e.g. 5000" value={form.creditLimit} onChange={(e) => f('creditLimit', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>APR (%)</label>
+                <input type="number" min="0" step="0.01" placeholder="e.g. 24.99" value={form.apr} onChange={(e) => f('apr', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Minimum Payment ($)</label>
+                <input type="number" min="0" step="0.01" placeholder="0.00" value={form.minPayment} onChange={(e) => f('minPayment', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Planned Payment ($)</label>
+                <input type="number" min="0" step="0.01" placeholder="0.00" value={form.plannedPayment} onChange={(e) => f('plannedPayment', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group" style={{ maxWidth: 160 }}>
+                <label>Due Day of Month</label>
+                <input type="number" min="1" max="31" step="1" placeholder="e.g. 15" value={form.dueDay} onChange={(e) => f('dueDay', e.target.value)} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Connected Accounts ── */}
+        <div className="add-account-section-label">
+          Connected Accounts
+          <button type="button" className="btn-add-small" style={{ marginLeft: 12 }} onClick={addConnection}>+ Add</button>
+        </div>
+        {form.connections.length === 0 && (
+          <div className="empty-state" style={{ marginBottom: 12, fontSize: 12 }}>
+            Optional: define money flows to/from other accounts (used in Cash Flow Map).
+          </div>
+        )}
+        {form.connections.map((conn, i) => (
+          <div key={i} className="connection-row">
+            <select
+              value={conn.toAccountId}
+              onChange={(e) => updateConn(i, 'toAccountId', e.target.value)}
+              className="conn-account-select"
+            >
+              <option value="">Select account…</option>
+              {(allAccounts || []).map((a) => (
+                <option key={a.id} value={a.id}>{a.name} ({a.owner})</option>
+              ))}
+            </select>
+            <select
+              value={conn.flowType}
+              onChange={(e) => updateConn(i, 'flowType', e.target.value)}
+              className="conn-flow-select"
+            >
+              {FLOW_TYPES.map((ft) => (
+                <option key={ft.value} value={ft.value}>{ft.label}</option>
+              ))}
+            </select>
+            <input
+              type="number" min="0" step="0.01" placeholder="Amount"
+              value={conn.amount}
+              onChange={(e) => updateConn(i, 'amount', e.target.value)}
+              className="conn-amount-input"
+            />
+            <input
+              placeholder="Label (optional)"
+              value={conn.label}
+              onChange={(e) => updateConn(i, 'label', e.target.value)}
+              className="conn-label-input"
+            />
+            <button type="button" className="btn-icon danger" onClick={() => removeConn(i)}>×</button>
+          </div>
+        ))}
+
         <div className="form-actions">
-          <button className="btn-primary" onClick={() => form.name && onAdd({ ...form, balance: Number(form.balance) || 0, monthlyContribution: Number(form.monthlyContribution) || 0, targetGoal: Number(form.targetGoal) || 0 })}>
-            Add Account
-          </button>
+          <button className="btn-primary" onClick={handleAdd} disabled={!form.name}>Add Account</button>
           <button className="btn-cancel-lg" onClick={onCancel}>Cancel</button>
         </div>
       </div>
@@ -290,13 +476,34 @@ export default function AccountsPanel() {
     });
   };
 
-  const deleteAccount = (id) => setAccounts((prev) => prev.filter((a) => a.id !== id));
+  const confirm = useConfirm();
+  const deleteAccount = async (id, name) => {
+    const ok = await confirm(name);
+    if (ok) setAccounts((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const addAccount = (data) => {
     setAccounts((prev) => [...prev, {
-      ...data, id: Date.now().toString(),
-      creditLimit: 0, apr: 0, minPayment: 0, plannedPayment: 0, dueDay: 1,
-      ytdContributions: 0, totalContributed: 0, annualTarget: 0, lastUpdated: null, history: [],
+      id: Date.now().toString(),
+      name: data.name,
+      owner: data.owner,
+      type: data.type,
+      institution: data.institution || '',
+      color: data.color || '',
+      balance: data.balance,
+      creditLimit: data.creditLimit || 0,
+      apr: data.apr || 0,
+      minPayment: data.minPayment || 0,
+      plannedPayment: data.plannedPayment || 0,
+      dueDay: data.dueDay || 1,
+      monthlyContribution: data.monthlyContribution || 0,
+      targetGoal: data.targetGoal || 0,
+      ytdContributions: data.ytdContributions || 0,
+      totalContributed: 0,
+      annualTarget: data.annualTarget || 0,
+      connections: data.connections || [],
+      lastUpdated: null,
+      history: [],
     }]);
     setShowAddForm(false);
   };
@@ -338,7 +545,7 @@ export default function AccountsPanel() {
         </div>
       </div>
 
-      {showAddForm && <AddAccountForm onAdd={addAccount} onCancel={() => setShowAddForm(false)} />}
+      {showAddForm && <AddAccountForm onAdd={addAccount} onCancel={() => setShowAddForm(false)} allAccounts={accounts} />}
 
       {GROUP_ORDER.map((group) => {
         if (!grouped[group] || grouped[group].length === 0) return null;
