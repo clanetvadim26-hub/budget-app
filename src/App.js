@@ -11,6 +11,7 @@ import {
 } from './utils/calculations';
 import { getPendingPaychecks, getUpcomingThisMonth } from './utils/recurringDates';
 import { DEFAULT_ACCOUNTS } from './data/accounts';
+import { DEFAULT_RECURRING_EXPENSES, DEFAULT_RECURRING_INCOMES } from './data/defaultRecurring';
 
 import NavBar from './components/NavBar';
 import OverviewPanel from './components/panels/OverviewPanel';
@@ -26,11 +27,16 @@ import InvestmentsPanel from './components/panels/InvestmentsPanel';
 import DebtPanel from './components/panels/DebtPanel';
 import CalendarPanel from './components/panels/CalendarPanel';
 import MoneyFlowPanel from './components/panels/MoneyFlowPanel';
+import BudgetPlanPanel from './components/panels/BudgetPlanPanel';
 import PendingConfirmationCard from './components/PendingConfirmationCard';
 import UpcomingExpensesCard from './components/UpcomingExpensesCard';
 import HealthScoreGauge, { calculateHealthScore } from './components/HealthScoreGauge';
 import InstallPrompt from './components/InstallPrompt';
 import MobileNav from './components/MobileNav';
+import PaycheckAllocationModal from './components/PaycheckAllocationModal';
+import JessicaPaycheckModal from './components/JessicaPaycheckModal';
+import VariableBillModal from './components/VariableBillModal';
+import FinancialAlerts from './components/FinancialAlerts';
 
 export default function App() {
   const [activeView, setActiveView] = useState('overview');
@@ -41,20 +47,29 @@ export default function App() {
   const [expenses, setExpenses] = useLocalStorage('budget_expenses', []);
   const [incomes, setIncomes] = useLocalStorage('budget_incomes', []);
 
-  // Recurring
-  const [recurringIncomes] = useLocalStorage('budget_recurring_incomes', []);
-  const [recurringExpenses] = useLocalStorage('budget_recurring_expenses', []);
+  // Recurring — seeded with defaults on empty DB
+  const [recurringIncomes] = useLocalStorage('budget_recurring_incomes', DEFAULT_RECURRING_INCOMES);
+  const [recurringExpenses] = useLocalStorage('budget_recurring_expenses', DEFAULT_RECURRING_EXPENSES);
   const [confirmedPaychecks, setConfirmedPaychecks] = useLocalStorage('budget_confirmed_paychecks', {});
   const [paidExpenseKeys, setPaidExpenseKeys] = useLocalStorage('budget_paid_recurring_expenses', {});
+
+  // Variable bill entries — shared between Vadim & Jessica via Supabase
+  const [variableBillEntries, setVariableBillEntries] = useLocalStorage('budget_variable_bill_entries', {});
+  // Jessica's paycheck amounts — keyed by `incomeId_YYYY-MM-DD`
+  const [, setJessicaPaycheckEntries] = useLocalStorage('budget_jessica_paycheck_entries', {});
 
   // Accounts & savings for health score
   const [accounts] = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
   const [savings] = useLocalStorage('budget_savings', {
     emergency: { current: 0, target: 0 },
-    roth_ira: { current: 0, target: 7000 },
+    roth_ira:    { current: 0, target: 7000 },
     investments: { current: 0, target: 0 },
-    general: { current: 0, target: 0 },
+    general:     { current: 0, target: 0 },
   });
+
+  // Session-dismissed modals (not persisted — resets on page reload)
+  const [sessionDismissed, setSessionDismissed] = useState(new Set());
+  const dismissModal = (key) => setSessionDismissed((prev) => new Set([...prev, key]));
 
   const now = new Date();
 
@@ -70,18 +85,18 @@ export default function App() {
     [incomes, viewMode]
   );
 
-  const totalIncome = getTotalIncome(filteredIncomes);
-  const totalExpenses = getTotalExpenses(filteredExpenses);
-  const net = totalIncome - totalExpenses;
-  const savingsRate = getSavingsRate(totalIncome, totalExpenses);
+  const totalIncome    = getTotalIncome(filteredIncomes);
+  const totalExpenses  = getTotalExpenses(filteredExpenses);
+  const net            = totalIncome - totalExpenses;
+  const savingsRate    = getSavingsRate(totalIncome, totalExpenses);
   const expensesByCategory = getExpensesByCategory(filteredExpenses);
-  const cashFlowData = getLast6MonthsData(incomes, expenses);
+  const cashFlowData   = getLast6MonthsData(incomes, expenses);
 
   const monthlyExpenses = getTotalExpenses(filterByMonth(expenses, now));
-  const monthlyIncome = getTotalIncome(filterByMonth(incomes, now));
+  const monthlyIncome   = getTotalIncome(filterByMonth(incomes, now));
 
-  // Recurring logic
-  const pendingPaychecks = useMemo(
+  // All pending paychecks
+  const allPendingPaychecks = useMemo(
     () => getPendingPaychecks(recurringIncomes, confirmedPaychecks),
     [recurringIncomes, confirmedPaychecks]
   );
@@ -97,8 +112,55 @@ export default function App() {
     [savingsRate, monthlyExpenses, savings, accounts]
   );
 
+  // ── Modal priority resolution ────────────────────────────────────────
+  const pendingVadimPaycheck = useMemo(
+    () => allPendingPaychecks.find((p) => p.income.metadata?.paycheckOwner === 'vadim'),
+    [allPendingPaychecks]
+  );
+
+  const pendingJessicaPaycheck = useMemo(
+    () => allPendingPaychecks.find((p) => p.income.metadata?.paycheckOwner === 'jessica'),
+    [allPendingPaychecks]
+  );
+
+  // Variable bills for current month not yet entered
+  const currentMonthKey = format(now, 'yyyy-MM');
+  const pendingVariableBills = useMemo(
+    () => recurringExpenses.filter((e) => {
+      if (!e.metadata?.isVariable || !e.active) return false;
+      const key = `${e.id}_${currentMonthKey}`;
+      return !variableBillEntries?.[key];
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recurringExpenses, variableBillEntries, currentMonthKey]
+  );
+
+  // Which modal is active (priority order, respecting session dismissals)
+  const activeModal = useMemo(() => {
+    if (pendingVadimPaycheck && !sessionDismissed.has(pendingVadimPaycheck.key)) {
+      return { type: 'vadim', data: pendingVadimPaycheck };
+    }
+    if (pendingJessicaPaycheck && !sessionDismissed.has(pendingJessicaPaycheck.key)) {
+      return { type: 'jessica', data: pendingJessicaPaycheck };
+    }
+    if (pendingVariableBills.length > 0) {
+      const bill = pendingVariableBills[0];
+      if (!sessionDismissed.has(`vbill_${bill.id}_${currentMonthKey}`)) {
+        return { type: 'variable_bill', data: bill };
+      }
+    }
+    return null;
+  }, [pendingVadimPaycheck, pendingJessicaPaycheck, pendingVariableBills, sessionDismissed, currentMonthKey]);
+
+  // Paychecks to show in the standard PendingConfirmationCard (non-modal ones)
+  const standardPendingPaychecks = useMemo(
+    () => allPendingPaychecks.filter((p) => !p.income.metadata?.isPaycheck),
+    [allPendingPaychecks]
+  );
+
+  // ── Actions ──────────────────────────────────────────────────────────
   const addExpense = (expense) => setExpenses((prev) => [...prev, expense]);
-  const addIncome = (income) => setIncomes((prev) => [...prev, income]);
+  const addIncome  = (income)  => setIncomes((prev)  => [...prev, income]);
 
   const confirmPaycheck = (item) => {
     setConfirmedPaychecks((prev) => ({
@@ -132,14 +194,47 @@ export default function App() {
     setPaidExpenseKeys((prev) => ({ ...prev, [key]: true }));
   };
 
+  // Vadim paycheck: confirm + post income
+  const handleVadimConfirm = (item) => {
+    confirmPaycheck(item);
+    dismissModal(item.key);
+  };
+
+  // Jessica paycheck: confirm + post income with entered amount
+  const handleJessicaConfirm = (item, amount) => {
+    const entryKey = item.key;
+    setJessicaPaycheckEntries((prev) => ({
+      ...prev,
+      [entryKey]: { amount, enteredAt: new Date().toISOString() },
+    }));
+    confirmPaycheckEdited(item, amount);
+    dismissModal(item.key);
+  };
+
+  // Variable bill: save amount and mark entered
+  const handleVariableBillSave = (billId, amount) => {
+    const key = `${billId}_${currentMonthKey}`;
+    setVariableBillEntries((prev) => ({
+      ...prev,
+      [key]: { amount, enteredAt: new Date().toISOString(), month: currentMonthKey },
+    }));
+    dismissModal(`vbill_${billId}_${currentMonthKey}`);
+  };
+
+  // Number of confirmed Vadim paychecks (for motivational message rotation)
+  const confirmedVadimCount = Object.keys(confirmedPaychecks).filter((k) =>
+    k.startsWith('inc_vadim_paycheck_')
+  ).length;
+
   const renderView = () => {
     switch (activeView) {
       case 'overview':
         return (
           <>
+            <FinancialAlerts accounts={accounts} savings={savings} recurringExpenses={recurringExpenses} />
             <HealthScoreGauge score={healthScore} breakdown={healthBreakdown} />
             <PendingConfirmationCard
-              pendingPaychecks={pendingPaychecks}
+              pendingPaychecks={standardPendingPaychecks}
               onConfirm={confirmPaycheck}
               onEditConfirm={confirmPaycheckEdited}
             />
@@ -155,6 +250,7 @@ export default function App() {
               viewMode={viewMode}
               incomes={filteredIncomes}
             />
+            <BudgetPlanPanel />
           </>
         );
       case 'expenses':
@@ -247,16 +343,47 @@ export default function App() {
         setActiveView={setActiveView}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        pendingCount={pendingPaychecks.length}
+        pendingCount={allPendingPaychecks.length}
         connectionStatus={connectionStatus}
       />
+
       <main className="main-content">{renderView()}</main>
+
       <MobileNav
         activeView={activeView}
         setActiveView={setActiveView}
-        pendingCount={pendingPaychecks.length}
+        pendingCount={allPendingPaychecks.length}
       />
+
       <InstallPrompt />
+
+      {/* ── Global Modals (highest priority first) ── */}
+      {activeModal?.type === 'vadim' && (
+        <PaycheckAllocationModal
+          paycheckItem={activeModal.data}
+          recurringExpenses={recurringExpenses}
+          confirmedCount={confirmedVadimCount}
+          onConfirm={handleVadimConfirm}
+          onClose={() => dismissModal(activeModal.data.key)}
+        />
+      )}
+
+      {activeModal?.type === 'jessica' && (
+        <JessicaPaycheckModal
+          paycheckItem={activeModal.data}
+          onConfirm={handleJessicaConfirm}
+          onClose={() => dismissModal(activeModal.data.key)}
+        />
+      )}
+
+      {activeModal?.type === 'variable_bill' && (
+        <VariableBillModal
+          bill={activeModal.data}
+          variableBillEntries={variableBillEntries}
+          onSave={handleVariableBillSave}
+          onClose={() => dismissModal(`vbill_${activeModal.data.id}_${currentMonthKey}`)}
+        />
+      )}
     </div>
   );
 }

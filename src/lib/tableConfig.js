@@ -47,6 +47,7 @@ const recIncomeFromRow = (r) => ({
   frequency: r.frequency,
   startDate: r.start_date,
   active:    r.active !== false,
+  metadata:  r.metadata || {},
 });
 const recIncomeToRow = (item) => ({
   id:         item.id,
@@ -56,6 +57,7 @@ const recIncomeToRow = (item) => ({
   frequency:  item.frequency,
   start_date: item.startDate,
   active:     item.active !== false,
+  metadata:   item.metadata || {},
 });
 
 // Recurring expenses
@@ -68,6 +70,7 @@ const recExpenseFromRow = (r) => ({
   startDate: r.start_date,
   dueDay:    r.due_day,
   active:    r.active !== false,
+  metadata:  r.metadata || {},
 });
 const recExpenseToRow = (item) => ({
   id:         item.id,
@@ -78,6 +81,7 @@ const recExpenseToRow = (item) => ({
   start_date: item.startDate || null,
   due_day:    item.dueDay    || null,
   active:     item.active !== false,
+  metadata:   item.metadata  || {},
 });
 
 // Roth IRA contributions
@@ -282,13 +286,13 @@ export const TABLE_CONFIG = {
 
   // ── Recurring ─────────────────────────────────────────────────────────
   budget_recurring_incomes: {
-    type: 'array', table: 'recurring_income',
+    type: 'array', table: 'recurring_income', seedOnEmpty: true,
     fromRow: recIncomeFromRow, toRow: recIncomeToRow,
     load: (key, def) => loadArray(TABLE_CONFIG.budget_recurring_incomes, key, def),
     sync: (prev, next) => syncArray(TABLE_CONFIG.budget_recurring_incomes, prev, next),
   },
   budget_recurring_expenses: {
-    type: 'array', table: 'recurring_expenses',
+    type: 'array', table: 'recurring_expenses', seedOnEmpty: true,
     fromRow: recExpenseFromRow, toRow: recExpenseToRow,
     load: (key, def) => loadArray(TABLE_CONFIG.budget_recurring_expenses, key, def),
     sync: (prev, next) => syncArray(TABLE_CONFIG.budget_recurring_expenses, prev, next),
@@ -361,6 +365,20 @@ export const TABLE_CONFIG = {
     type: 'state', stateKey: 'paid_cc_payments',
     load: (key, def) => loadStateItem('paid_cc_payments', key, def),
     sync: (_, next) => syncStateItem('paid_cc_payments', next),
+    realtimeTable: 'app_state',
+  },
+  // Variable bill entries (electricity, water) — keyed by `expenseId_YYYY-MM`
+  budget_variable_bill_entries: {
+    type: 'state', stateKey: 'variable_bill_entries',
+    load: (key, def) => loadStateItem('variable_bill_entries', key, def),
+    sync: (_, next) => syncStateItem('variable_bill_entries', next),
+    realtimeTable: 'app_state',
+  },
+  // Jessica's paycheck amounts — keyed by `incomeId_YYYY-MM-DD`
+  budget_jessica_paycheck_entries: {
+    type: 'state', stateKey: 'jessica_paycheck_entries',
+    load: (key, def) => loadStateItem('jessica_paycheck_entries', key, def),
+    sync: (_, next) => syncStateItem('jessica_paycheck_entries', next),
     realtimeTable: 'app_state',
   },
 };

@@ -90,6 +90,7 @@ export const DEFAULT_ACCOUNTS = [
   baseCC({ id: 'cap1_cc1_vadim',   name: 'Capital One Credit Card #1',   owner: 'Vadim',   type: 'credit' }),
   baseCC({ id: 'cap1_cc2_vadim',   name: 'Capital One Credit Card #2',   owner: 'Vadim',   type: 'credit' }),
   baseCC({ id: 'cap1_cc3_vadim',   name: 'Capital One Credit Card #3',   owner: 'Vadim',   type: 'credit' }),
+  baseCC({ id: 'bilt_cc_vadim',    name: 'Bilt Credit Card',             owner: 'Vadim',   type: 'credit', institution: 'Bilt', dueDay: 2 }),
 
   // ── Retirement ────────────────────────────────────────────
   {
