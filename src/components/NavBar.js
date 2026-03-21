@@ -1,19 +1,20 @@
 import React from 'react';
 
 const NAV_ITEMS = [
-  { id: 'overview',    label: 'Overview',    icon: '📊' },
-  { id: 'calendar',    label: 'Calendar',    icon: '📅' },
-  { id: 'expenses',    label: 'Expenses',    icon: '📉' },
-  { id: 'cashflow',    label: 'Cash Flow',   icon: '📈' },
-  { id: 'savings',     label: 'Savings',     icon: '🏦' },
-  { id: 'accounts',    label: 'Accounts',    icon: '💳' },
-  { id: 'moneyflow',   label: 'Money Flow',  icon: '🔀' },
-  { id: 'investments', label: 'Investments', icon: '💼' },
-  { id: 'debt',        label: 'Debt',        icon: '🔴' },
-  { id: 'recurring',   label: 'Recurring',   icon: '🔄' },
-  { id: 'add-expense', label: 'Add Expense', icon: '➕' },
-  { id: 'add-income',  label: 'Add Income',  icon: '💵' },
-  { id: 'advice',      label: 'Advice',      icon: '💡' },
+  { id: 'overview',     label: 'Overview',     icon: '📊' },
+  { id: 'budget-plan',  label: 'Budget Plan',  icon: '📝' },
+  { id: 'calendar',     label: 'Calendar',     icon: '📅' },
+  { id: 'expenses',     label: 'Expenses',     icon: '📉' },
+  { id: 'cashflow',     label: 'Cash Flow',    icon: '📈' },
+  { id: 'savings',      label: 'Savings',      icon: '🏦' },
+  { id: 'accounts',     label: 'Accounts',     icon: '💳' },
+  { id: 'moneyflow',    label: 'Money Flow',   icon: '🔀' },
+  { id: 'investments',  label: 'Investments',  icon: '💼' },
+  { id: 'debt',         label: 'Debt',         icon: '🔴' },
+  { id: 'recurring',    label: 'Recurring',    icon: '🔄' },
+  { id: 'add-expense',  label: 'Add Expense',  icon: '➕' },
+  { id: 'add-income',   label: 'Add Income',   icon: '💵' },
+  { id: 'advice',       label: 'Advice',       icon: '💡' },
 ];
 
 const CONN_META = {

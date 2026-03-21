@@ -11,6 +11,7 @@ const PRIMARY = [
 
 // All items shown in the "More" sheet (excluding ones already in PRIMARY)
 const MORE_ITEMS = [
+  { id: 'budget-plan', icon: '📝', label: 'Budget Plan' },
   { id: 'expenses',    icon: '📉', label: 'Expenses'    },
   { id: 'cashflow',    icon: '📈', label: 'Cash Flow'   },
   { id: 'savings',     icon: '🏦', label: 'Savings'     },

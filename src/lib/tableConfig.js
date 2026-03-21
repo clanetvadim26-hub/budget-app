@@ -367,6 +367,13 @@ export const TABLE_CONFIG = {
     sync: (_, next) => syncStateItem('paid_cc_payments', next),
     realtimeTable: 'app_state',
   },
+  // Central budget settings (single source of truth for all plan numbers)
+  budget_settings: {
+    type: 'state', stateKey: 'budget_settings',
+    load: (key, def) => loadStateItem('budget_settings', key, def),
+    sync: (_, next) => syncStateItem('budget_settings', next),
+    realtimeTable: 'app_state',
+  },
   // Variable bill entries (electricity, water) — keyed by `expenseId_YYYY-MM`
   budget_variable_bill_entries: {
     type: 'state', stateKey: 'variable_bill_entries',

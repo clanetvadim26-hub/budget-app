@@ -1,11 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/accounts';
 import { formatCurrency } from '../../utils/calculations';
 import { monthlyInterest } from '../../utils/debtCalculations';
 import NetWorthChart from '../charts/NetWorthChart';
 import { useConfirm } from '../ConfirmModal';
+
+function GoalProjection({ balance, targetGoal, monthlyContribution }) {
+  if (!targetGoal || targetGoal <= 0) return null;
+  const pct = Math.min((balance / targetGoal) * 100, 100);
+  if (pct >= 100) {
+    return <span className="goal-badge goal-reached">🎉 Goal Reached!</span>;
+  }
+  if (!monthlyContribution || monthlyContribution <= 0) {
+    return <span className="goal-badge goal-no-contrib">Set contribution to project</span>;
+  }
+  const gap    = targetGoal - balance;
+  const months = Math.ceil(gap / monthlyContribution);
+  const date   = addMonths(new Date(), months);
+  const status = months <= 6  ? 'ahead'
+               : months <= 18 ? 'on-track'
+               :                'behind';
+  const meta   = {
+    ahead:    { label: 'Ahead',    color: '#4ADE80' },
+    'on-track':{ label: 'On Track', color: '#FBBF24' },
+    behind:   { label: 'Behind',   color: '#F87171' },
+  }[status];
+  return (
+    <span className="goal-projection">
+      <span className="goal-badge" style={{ background: meta.color + '22', color: meta.color }}>{meta.label}</span>
+      <span className="goal-proj-date">Goal in ~{months}mo ({format(date, 'MMM yyyy')})</span>
+    </span>
+  );
+}
 
 const TYPE_GROUPS = {
   'Checking & Savings': ['checking', 'savings', 'money_market', 'cd'],
@@ -113,9 +141,14 @@ function AccountCard({ account, onSave, onDelete }) {
             <span className="account-goal-label">Goal: {formatCurrency(account.targetGoal)}</span>
             <span style={{ color: meta.color }}>{pct.toFixed(0)}%</span>
           </div>
-          <div className="progress-bar-wrap" style={{ marginBottom: 0 }}>
-            <div className="progress-bar-fill" style={{ width: `${pct}%`, backgroundColor: meta.color }} />
+          <div className="progress-bar-wrap" style={{ marginBottom: 4 }}>
+            <div className="progress-bar-fill" style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#4ADE80' : meta.color }} />
           </div>
+          <GoalProjection
+            balance={account.balance}
+            targetGoal={account.targetGoal}
+            monthlyContribution={account.monthlyContribution}
+          />
         </div>
       )}
 

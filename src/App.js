@@ -28,6 +28,7 @@ import DebtPanel from './components/panels/DebtPanel';
 import CalendarPanel from './components/panels/CalendarPanel';
 import MoneyFlowPanel from './components/panels/MoneyFlowPanel';
 import BudgetPlanPanel from './components/panels/BudgetPlanPanel';
+import FullBudgetPlanPanel from './components/panels/FullBudgetPlanPanel';
 import PendingConfirmationCard from './components/PendingConfirmationCard';
 import UpcomingExpensesCard from './components/UpcomingExpensesCard';
 import HealthScoreGauge, { calculateHealthScore } from './components/HealthScoreGauge';
@@ -274,6 +275,8 @@ export default function App() {
         return <DebtPanel />;
       case 'calendar':
         return <CalendarPanel />;
+      case 'budget-plan':
+        return <FullBudgetPlanPanel />;
       case 'moneyflow':
         return <MoneyFlowPanel />;
       case 'recurring':
