@@ -1,4 +1,5 @@
 import React from 'react';
+import SyncStatusBar from './SyncStatusBar';
 
 const NAV_ITEMS = [
   { id: 'overview',     label: 'Overview',     icon: '📊' },
@@ -40,6 +41,7 @@ export default function NavBar({ activeView, setActiveView, viewMode, setViewMod
           />
           <span className="conn-label">{conn.label}</span>
         </div>
+        <SyncStatusBar />
       </div>
 
       <div className="nav-links">

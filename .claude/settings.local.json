@@ -6,7 +6,8 @@
       "Read(//c/Users/clane/.claude/projects/C--Users-clane-budget-app/memory/**)",
       "Bash(grep -v \"^$\")",
       "Bash(npm install:*)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(npx react-scripts:*)"
     ]
   }
 }

@@ -8,31 +8,56 @@ import { formatCurrencyFull } from '../../utils/calculations';
 import { getCategoryById } from '../../data/categories';
 import InlineEdit from '../InlineEdit';
 
-// ── Helpers ────────────────────────────────────────────────────────────
-function deepSet(obj, path, value) {
-  if (path.length === 0) return value;
-  const [head, ...rest] = path;
-  return { ...obj, [head]: deepSet(obj[head] || {}, rest, value) };
-}
+// ── Constants ────────────────────────────────────────────────────────────────
+const VADIM_SAVINGS = [
+  { key: 'vadim_savings_cap1_monthly',          accountId: 'cap1_joint_savings',       label: 'Capital One Joint Savings (Emergency Fund)', targetGoal: 20000 },
+  { key: 'vadim_savings_roth_monthly',          accountId: 'roth_ira_vadim',           label: 'Vadim Roth IRA 2025',                         targetGoal: 7000, deadline: '2026-04-15' },
+  { key: 'vadim_savings_brokerage_monthly',     accountId: 'brokerage_joint',          label: 'Ameriprise Joint Brokerage',                  targetGoal: 0 },
+  { key: 'vadim_savings_ameriprise_monthly',    accountId: 'ameriprise_savings_vadim', label: 'Ameriprise Savings (Vacation & Fun)',          targetGoal: 5000 },
+  { key: 'vadim_savings_401k_monthly',          accountId: '401k_vadim',               label: 'Vadim 401k (starts June 2026)',               targetGoal: 0, startDate: '2026-06-01' },
+];
 
-function projectedMonths(balance, target, monthly) {
-  if (!monthly || monthly <= 0) return null;
-  const gap = target - balance;
-  if (gap <= 0) return 0;
-  return Math.ceil(gap / monthly);
+const VADIM_BUDGETS = [
+  { key: 'vadim_budget_groceries',    label: 'Groceries',   icon: '🛒' },
+  { key: 'vadim_budget_gas',          label: 'Gas',         icon: '⛽' },
+  { key: 'vadim_budget_dining',       label: 'Dining Out',  icon: '🍽️' },
+  { key: 'vadim_budget_electricity',  label: 'Electricity', icon: '⚡' },
+  { key: 'vadim_budget_water',        label: 'Water',       icon: '💧' },
+];
+
+const JESSICA_ALLOCS = [
+  { key: 'jessica_alloc_household', label: '🏠 Household contribution',   color: '#60A5FA' },
+  { key: 'jessica_alloc_savings',   label: '💰 Capital One Joint Savings', color: '#4ADE80' },
+  { key: 'jessica_alloc_roth',      label: '📈 Jessica Roth IRA',          color: '#D4AF37' },
+  { key: 'jessica_alloc_personal',  label: '👩 Personal spending',          color: '#F472B6' },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Format a YYYY-MM-DD date string as "in X days (MM/DD/YY)" */
+function formatPayday(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    const date = parseISO(dateStr);
+    const days = differenceInDays(date, new Date());
+    const formatted = format(date, 'MM/dd/yy');
+    if (days < 0)  return `${Math.abs(days)}d ago (${formatted})`;
+    if (days === 0) return `Today! (${formatted})`;
+    if (days === 1) return `Tomorrow (${formatted})`;
+    return `in ${days} days (${formatted})`;
+  } catch { return dateStr; }
 }
 
 function projectedDateLabel(balance, target, monthly) {
-  const months = projectedMonths(balance, target, monthly);
-  if (months === null) return 'Set contribution to project';
-  if (months === 0)    return 'Goal reached!';
+  if (!monthly || monthly <= 0) return 'Set contribution to project';
+  const gap = target - balance;
+  if (gap <= 0) return 'Goal reached!';
+  const months = Math.ceil(gap / monthly);
   const date = addMonths(new Date(), months);
   return `Goal in ~${months} month${months !== 1 ? 's' : ''} (${format(date, 'MMM yyyy')})`;
 }
 
-const VADIM_PAYCHECK = 2200;
-
-// ── Sub-components ─────────────────────────────────────────────────────
+// ── Shared sub-components ────────────────────────────────────────────────────
 function SectionHeader({ title, icon, total, totalColor }) {
   return (
     <div className="fbp-section-header">
@@ -63,48 +88,29 @@ function SummaryBar({ income, fixed, variable, savings }) {
     <div className="fbp-summary">
       <div className="fbp-summary-title">Monthly Summary</div>
       <div className="fbp-summary-grid">
-        <div className="fbp-summary-row">
-          <span>Total Income</span>
-          <span className="fbp-summary-val positive">{formatCurrencyFull(income)}</span>
-        </div>
-        <div className="fbp-summary-row">
-          <span>Fixed Expenses</span>
-          <span className="fbp-summary-val" style={{ color: '#F87171' }}>−{formatCurrencyFull(fixed)}</span>
-        </div>
-        <div className="fbp-summary-row">
-          <span>Variable Budgets</span>
-          <span className="fbp-summary-val" style={{ color: '#FBBF24' }}>−{formatCurrencyFull(variable)}</span>
-        </div>
-        <div className="fbp-summary-row">
-          <span>Savings & Investments</span>
-          <span className="fbp-summary-val" style={{ color: '#4ADE80' }}>−{formatCurrencyFull(savings)}</span>
-        </div>
+        <div className="fbp-summary-row"><span>Total Income</span><span className="fbp-summary-val positive">{formatCurrencyFull(income)}</span></div>
+        <div className="fbp-summary-row"><span>Fixed Expenses</span><span className="fbp-summary-val" style={{ color: '#F87171' }}>−{formatCurrencyFull(fixed)}</span></div>
+        <div className="fbp-summary-row"><span>Variable Budgets</span><span className="fbp-summary-val" style={{ color: '#FBBF24' }}>−{formatCurrencyFull(variable)}</span></div>
+        <div className="fbp-summary-row"><span>Savings & Investments</span><span className="fbp-summary-val" style={{ color: '#4ADE80' }}>−{formatCurrencyFull(savings)}</span></div>
         <div className="fbp-summary-row fbp-summary-disc">
           <span>Discretionary</span>
           <span className="fbp-summary-val" style={{ color: disc > 0 ? '#A78BFA' : '#F87171', fontWeight: 700 }}>
             {formatCurrencyFull(income - fixed - variable - savings)}
           </span>
         </div>
-        <div className="fbp-summary-row">
-          <span>Savings Rate</span>
-          <span className="fbp-summary-val" style={{ color: srColor }}>{savingsRate}%</span>
-        </div>
+        <div className="fbp-summary-row"><span>Savings Rate</span><span className="fbp-summary-val" style={{ color: srColor }}>{savingsRate}%</span></div>
       </div>
       <div className="fbp-bar-wrap">
         {segs.map((s) => (
-          <div
-            key={s.label}
-            className="fbp-bar-seg"
+          <div key={s.label} className="fbp-bar-seg"
             style={{ width: `${Math.max(0, (s.value / total) * 100)}%`, background: s.color }}
-            title={`${s.label}: ${formatCurrencyFull(s.value)}`}
-          />
+            title={`${s.label}: ${formatCurrencyFull(s.value)}`} />
         ))}
       </div>
       <div className="fbp-bar-legend">
         {segs.map((s) => (
           <span key={s.label} className="fbp-legend-item">
-            <span className="fbp-legend-dot" style={{ background: s.color }} />
-            {s.label}
+            <span className="fbp-legend-dot" style={{ background: s.color }} />{s.label}
           </span>
         ))}
       </div>
@@ -112,58 +118,119 @@ function SummaryBar({ income, fixed, variable, savings }) {
   );
 }
 
-// ── VADIM VIEW ─────────────────────────────────────────────────────────
-function VadimView({ settings, setSettings, accounts, setAccounts, recurringExpenses, setRecurringExpenses }) {
-  const vSet = settings.vadim || {};
+// ── Reusable Add/Delete expense table used by both Vadim and Jessica ─────────
+function ExpenseTable({ expenses, onUpdate, onDelete, onAdd }) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newAmt, setNewAmt]   = useState('');
+  const [newDue, setNewDue]   = useState('');
 
-  const updateVadim = (path, value) => {
-    setSettings((prev) => deepSet(prev, ['vadim', ...path], value));
+  const submit = () => {
+    const amount = Number(newAmt);
+    if (!newName.trim() || !amount) return;
+    onAdd({ name: newName.trim(), amount, dueDay: newDue ? Number(newDue) : null });
+    setNewName(''); setNewAmt(''); setNewDue('');
+    setAdding(false);
   };
 
-  const updateSavings = (accountId, field, value) => {
-    const monthly     = field === 'monthly'     ? value : (vSet.savings?.[accountId]?.monthly     || 0);
-    const perPaycheck = field === 'perPaycheck' ? value : (vSet.savings?.[accountId]?.perPaycheck || 0);
-    setSettings((prev) => deepSet(prev, ['vadim', 'savings', accountId], {
-      ...(prev.vadim?.savings?.[accountId] || {}),
-      monthly,
-      perPaycheck: field === 'monthly' ? monthly / 2 : perPaycheck,
-      [field]: value,
-    }));
-    // Sync to accounts
-    if (field === 'monthly') {
-      setAccounts((prev) => prev.map((a) => a.id === accountId ? { ...a, monthlyContribution: value } : a));
-    }
+  const cancel = () => {
+    setAdding(false); setNewName(''); setNewAmt(''); setNewDue('');
   };
 
-  const updateVarBudget = (key, value) => {
-    setSettings((prev) => deepSet(prev, ['vadim', 'variableBudgets', key], value));
+  return (
+    <div className="fbp-table fbp-expenses-table">
+      <div className="fbp-table-head">
+        <span>Bill</span><span>Amount</span><span className="fbp-col-due">Due</span><span />
+      </div>
+
+      {expenses.length === 0 && !adding && (
+        <div className="fbp-empty-row">No fixed expenses — click ＋ to add one</div>
+      )}
+
+      {expenses.map((exp) => {
+        const cat  = getCategoryById(exp.category);
+        const meta = exp.metadata || {};
+        return (
+          <div key={exp.id} className="fbp-table-row">
+            <span className="fbp-row-name">
+              {cat.icon}{' '}
+              <InlineEdit value={exp.name} onSave={(v) => onUpdate(exp.id, 'name', v)}
+                type="text" formatFn={(v) => v} className="fbp-ie fbp-ie-name" />
+              {meta.isOneTime  && <span className="fbp-chip red">One-time</span>}
+              {meta.isPrepaid  && <span className="fbp-chip yellow">Prepaid</span>}
+              {meta.isVariable && <span className="fbp-chip blue">Variable</span>}
+            </span>
+            <InlineEdit value={exp.amount} onSave={(v) => onUpdate(exp.id, 'amount', v)}
+              formatFn={formatCurrencyFull} className="fbp-ie" />
+            <span className="fbp-col-due fbp-subdued">
+              <InlineEdit value={exp.dueDay ?? 0} onSave={(v) => onUpdate(exp.id, 'dueDay', v)}
+                formatFn={(v) => v > 0 ? `${v}th` : '—'} className="fbp-ie" min={0} step="1" />
+            </span>
+            <button className="fbp-delete-btn" onClick={() => onDelete(exp.id)} title="Delete">×</button>
+          </div>
+        );
+      })}
+
+      {adding ? (
+        <div className="fbp-add-row">
+          <input className="fbp-add-input fbp-add-name" placeholder="Expense name"
+            value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus
+            onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          <input className="fbp-add-input fbp-add-amount" type="number" min="0" step="0.01"
+            placeholder="Amount" value={newAmt} onChange={(e) => setNewAmt(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          <input className="fbp-add-input fbp-add-due" type="number" min="1" max="31"
+            placeholder="Day" value={newDue} onChange={(e) => setNewDue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          <button className="fbp-add-confirm" onClick={submit}>✓ Add</button>
+          <button className="fbp-add-cancel"  onClick={cancel}>✕</button>
+        </div>
+      ) : (
+        <button className="fbp-add-btn" onClick={() => setAdding(true)}>＋ Add expense</button>
+      )}
+    </div>
+  );
+}
+
+// ── VADIM VIEW ───────────────────────────────────────────────────────────────
+function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpenses, setRecurringExpenses }) {
+  const paycheck      = settings['vadim_paycheck']    ?? 2200;
+  const monthlyIncome = Math.round((paycheck * 26) / 12 * 100) / 100;
+
+  // Bidirectional: savings setting → accounts.monthlyContribution
+  const updateSavings = (settingKey, accountId, value) => {
+    setSetting(settingKey, value);
+    setAccounts((prev) => prev.map((a) =>
+      a.id === accountId ? { ...a, monthlyContribution: value } : a
+    ));
   };
 
   const updateExpense = (id, field, value) => {
-    setRecurringExpenses((prev) => prev.map((e) => e.id === id ? { ...e, [field]: field === 'amount' ? Number(value) : value } : e));
+    setRecurringExpenses((prev) => prev.map((e) =>
+      e.id === id ? { ...e, [field]: field === 'amount' ? Number(value) : value } : e
+    ));
   };
 
-  const paycheck       = vSet.paycheck    || VADIM_PAYCHECK;
-  const monthlyIncome  = Math.round((paycheck * 26) / 12 * 100) / 100;
-  const savingsObj     = vSet.savings     || {};
-  const varBudgets     = vSet.variableBudgets || {};
+  const deleteExpense = (id) => setRecurringExpenses((prev) => prev.filter((e) => e.id !== id));
 
-  const fixedExpenses  = (recurringExpenses || []).filter((e) => {
+  const addExpense = ({ name, amount, dueDay }) => {
+    setRecurringExpenses((prev) => [...prev, {
+      id: `re_vadim_${Date.now()}`,
+      name, amount, active: true,
+      category: 'housing', frequency: 'monthly', dueDay,
+      metadata: { tag: 'fixed', owner: 'vadim' },
+    }]);
+  };
+
+  // Fixed = not a budget line, not Jessica's, active
+  const fixedExpenses = (recurringExpenses || []).filter((e) => {
     const meta = e.metadata || {};
-    return !meta.isBudget && e.active;
+    return !meta.isBudget && meta.owner !== 'jessica' && e.active;
   });
 
   const totalFixed    = fixedExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const totalVariable = Object.values(varBudgets).reduce((s, v) => s + (v || 0), 0);
-  const totalSavings  = Object.values(savingsObj).reduce((s, sv) => s + (sv?.monthly || 0), 0);
-
-  const VARIABLE_LABELS = {
-    groceries: { label: 'Groceries', icon: '🛒' },
-    gas:       { label: 'Gas',       icon: '⛽' },
-    dining_out:{ label: 'Dining Out',icon: '🍽️' },
-    electricity:{ label: 'Electricity', icon: '⚡' },
-    water:     { label: 'Water',     icon: '💧' },
-  };
+  const totalVariable = VADIM_BUDGETS.reduce((s, b) => s + (settings[b.key] || 0), 0);
+  const totalSavings  = VADIM_SAVINGS.reduce((s, sv) => s + (settings[sv.key] || 0), 0);
 
   return (
     <div className="fbp-view">
@@ -173,14 +240,8 @@ function VadimView({ settings, setSettings, accounts, setAccounts, recurringExpe
         <div className="fbp-table">
           <div className="fbp-table-row">
             <span className="fbp-row-label">Bi-weekly paycheck (net)</span>
-            <span>
-              <InlineEdit
-                value={paycheck}
-                onSave={(v) => updateVadim(['paycheck'], v)}
-                formatFn={formatCurrencyFull}
-                className="fbp-ie"
-              />
-            </span>
+            <InlineEdit value={paycheck} onSave={(v) => setSetting('vadim_paycheck', v)}
+              formatFn={formatCurrencyFull} className="fbp-ie" />
           </div>
           <div className="fbp-table-row fbp-subdued">
             <span>Monthly equivalent (×26/12)</span>
@@ -188,14 +249,11 @@ function VadimView({ settings, setSettings, accounts, setAccounts, recurringExpe
           </div>
           <div className="fbp-table-row">
             <span className="fbp-row-label">Next payday</span>
-            <span>
+            <span className="fbp-payday">
               <InlineEdit
-                value={vSet.nextPayday || '2026-03-21'}
-                onSave={(v) => updateVadim(['nextPayday'], v)}
-                type="text"
-                formatFn={(v) => v}
-                className="fbp-ie"
-                prefix=""
+                value={settings['vadim_next_payday'] || '2026-03-21'}
+                onSave={(v) => setSetting('vadim_next_payday', v)}
+                type="text" formatFn={formatPayday} className="fbp-ie"
               />
             </span>
           </div>
@@ -205,61 +263,25 @@ function VadimView({ settings, setSettings, accounts, setAccounts, recurringExpe
       {/* ── Fixed Expenses ── */}
       <div className="fbp-section">
         <SectionHeader title="Fixed Expenses" icon="📋" total={totalFixed} totalColor="#F87171" />
-        <div className="fbp-table fbp-expenses-table">
-          <div className="fbp-table-head">
-            <span>Bill</span>
-            <span>Amount</span>
-            <span className="fbp-col-due">Due</span>
-          </div>
-          {fixedExpenses.map((exp) => {
-            const cat   = getCategoryById(exp.category);
-            const meta  = exp.metadata || {};
-            return (
-              <div key={exp.id} className="fbp-table-row">
-                <span className="fbp-row-name">
-                  {cat.icon} {exp.name}
-                  {meta.isOneTime  && <span className="fbp-chip red">One-time</span>}
-                  {meta.isPrepaid  && <span className="fbp-chip yellow">Prepaid</span>}
-                  {meta.isVariable && <span className="fbp-chip blue">Variable</span>}
-                </span>
-                <span>
-                  <InlineEdit
-                    value={exp.amount}
-                    onSave={(v) => updateExpense(exp.id, 'amount', v)}
-                    formatFn={formatCurrencyFull}
-                    className="fbp-ie"
-                  />
-                </span>
-                <span className="fbp-col-due fbp-subdued">
-                  {exp.dueDay ? `${exp.dueDay}th` : 'monthly'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <ExpenseTable
+          expenses={fixedExpenses}
+          onUpdate={updateExpense}
+          onDelete={deleteExpense}
+          onAdd={addExpense}
+        />
       </div>
 
       {/* ── Variable Budgets ── */}
       <div className="fbp-section">
         <SectionHeader title="Variable Budgets" icon="🧾" total={totalVariable} totalColor="#FBBF24" />
         <div className="fbp-table">
-          {Object.entries(varBudgets).map(([key, amount]) => {
-            const meta = VARIABLE_LABELS[key] || { label: key, icon: '💰' };
-            return (
-              <div key={key} className="fbp-table-row">
-                <span className="fbp-row-label">{meta.icon} {meta.label}</span>
-                <span>
-                  <InlineEdit
-                    value={amount}
-                    onSave={(v) => updateVarBudget(key, v)}
-                    formatFn={formatCurrencyFull}
-                    className="fbp-ie"
-                    suffix="/mo"
-                  />
-                </span>
-              </div>
-            );
-          })}
+          {VADIM_BUDGETS.map(({ key, label, icon }) => (
+            <div key={key} className="fbp-table-row">
+              <span className="fbp-row-label">{icon} {label}</span>
+              <InlineEdit value={settings[key] ?? 0} onSave={(v) => setSetting(key, v)}
+                formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -268,85 +290,84 @@ function VadimView({ settings, setSettings, accounts, setAccounts, recurringExpe
         <SectionHeader title="Savings & Investments" icon="📈" total={totalSavings} totalColor="#4ADE80" />
         <div className="fbp-table fbp-savings-table">
           <div className="fbp-table-head fbp-savings-head">
-            <span>Account</span>
-            <span>Monthly</span>
-            <span>/Paycheck</span>
+            <span>Account</span><span>Monthly</span><span>/Paycheck</span>
           </div>
-          {Object.entries(savingsObj).map(([accountId, sv]) => {
-            const acct = (accounts || []).find((a) => a.id === accountId);
-            const monthly = sv?.monthly || 0;
-            const perPay  = sv?.perPaycheck || (monthly / 2);
-            const startDate = sv?.startDate;
-            const isFuture  = startDate && new Date(startDate) > new Date();
-            const daysTo    = isFuture ? differenceInDays(parseISO(startDate), new Date()) : 0;
-            const projected = acct && sv?.targetGoal > 0
-              ? projectedDateLabel(acct.balance || 0, sv.targetGoal, monthly)
+          {VADIM_SAVINGS.map(({ key, accountId, label, targetGoal, startDate }) => {
+            const monthly     = settings[key] ?? 0;
+            const perPaycheck = monthly / 2;
+            const acct        = (accounts || []).find((a) => a.id === accountId);
+            const isFuture    = startDate && new Date(startDate) > new Date();
+            const daysTo      = isFuture ? differenceInDays(parseISO(startDate), new Date()) : 0;
+            const projected   = acct && targetGoal > 0
+              ? projectedDateLabel(acct.balance || 0, targetGoal, monthly)
               : null;
 
             return (
-              <div key={accountId} className={`fbp-table-row fbp-savings-row ${isFuture ? 'fbp-future' : ''}`}>
+              <div key={key} className={`fbp-table-row fbp-savings-row ${isFuture ? 'fbp-future' : ''}`}>
                 <div className="fbp-savings-name">
-                  <span>{sv.label || accountId}</span>
+                  <span>{label}</span>
                   {isFuture && (
-                    <span className="fbp-chip purple">Starts {format(parseISO(startDate), 'MMM yyyy')} · {daysTo}d</span>
+                    <span className="fbp-chip purple">
+                      Starts {format(parseISO(startDate), 'MMM yyyy')} · {daysTo}d
+                    </span>
                   )}
                   {projected && <span className="fbp-projected">{projected}</span>}
                 </div>
-                <span>
-                  {isFuture ? (
-                    <InlineEdit value={monthly} onSave={(v) => updateSavings(accountId, 'monthly', v)} formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
-                  ) : (
-                    <InlineEdit value={monthly} onSave={(v) => updateSavings(accountId, 'monthly', v)} formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
-                  )}
-                </span>
-                <span className="fbp-subdued">
-                  {formatCurrencyFull(perPay)}
-                </span>
+                <InlineEdit value={monthly} onSave={(v) => updateSavings(key, accountId, v)}
+                  formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
+                <span className="fbp-subdued">{formatCurrencyFull(perPaycheck)}</span>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Summary ── */}
-      <SummaryBar
-        income={monthlyIncome}
-        fixed={totalFixed}
-        variable={totalVariable}
-        savings={totalSavings}
-      />
+      <SummaryBar income={monthlyIncome} fixed={totalFixed} variable={totalVariable} savings={totalSavings} />
     </div>
   );
 }
 
-// ── JESSICA VIEW ───────────────────────────────────────────────────────
-function JessicaView({ settings, setSettings, accounts, setAccounts }) {
-  const jSet = settings.jessica || {};
-  const alloc = jSet.allocations || { household: 40, jointSavings: 10, rothIRA: 10, personal: 40 };
-  const estMonthly = jSet.estimatedMonthlyIncome || 2000;
-  const allocTotal = Object.values(alloc).reduce((s, v) => s + (v || 0), 0);
+// ── JESSICA VIEW ─────────────────────────────────────────────────────────────
+function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses }) {
+  const estMonthly = settings['jessica_estimated_monthly'] ?? 2000;
+
+  const allocValues = {
+    jessica_alloc_household: settings['jessica_alloc_household'] ?? 40,
+    jessica_alloc_savings:   settings['jessica_alloc_savings']   ?? 10,
+    jessica_alloc_roth:      settings['jessica_alloc_roth']      ?? 10,
+    jessica_alloc_personal:  settings['jessica_alloc_personal']  ?? 40,
+  };
+  const allocTotal   = Object.values(allocValues).reduce((s, v) => s + (v || 0), 0);
   const allocWarning = allocTotal !== 100;
 
-  const updateJessica = (path, value) => setSettings((prev) => deepSet(prev, ['jessica', ...path], value));
-  const updateAlloc   = (key, value) => setSettings((prev) => deepSet(prev, ['jessica', 'allocations', key], value));
+  const amounts = {};
+  for (const a of JESSICA_ALLOCS) {
+    amounts[a.key] = Math.round(estMonthly * (allocValues[a.key] || 0) / 100 * 100) / 100;
+  }
 
-  const amounts = {
-    household:    Math.round(estMonthly * (alloc.household    || 0) / 100 * 100) / 100,
-    jointSavings: Math.round(estMonthly * (alloc.jointSavings || 0) / 100 * 100) / 100,
-    rothIRA:      Math.round(estMonthly * (alloc.rothIRA      || 0) / 100 * 100) / 100,
-    personal:     Math.round(estMonthly * (alloc.personal     || 0) / 100 * 100) / 100,
+  // Jessica's fixed expenses filtered from shared recurringExpenses by owner
+  const jessicaFixed = (recurringExpenses || []).filter((e) => {
+    const meta = e.metadata || {};
+    return meta.owner === 'jessica' && e.active;
+  });
+
+  const updateExpense = (id, field, value) => {
+    setRecurringExpenses((prev) => prev.map((e) =>
+      e.id === id ? { ...e, [field]: field === 'amount' ? Number(value) : value } : e
+    ));
+  };
+  const deleteExpense = (id) => setRecurringExpenses((prev) => prev.filter((e) => e.id !== id));
+  const addExpense = ({ name, amount, dueDay }) => {
+    setRecurringExpenses((prev) => [...prev, {
+      id: `re_jessica_${Date.now()}`,
+      name, amount, active: true,
+      category: 'loan_payments', frequency: 'monthly', dueDay,
+      metadata: { tag: 'fixed', owner: 'jessica' },
+    }]);
   };
 
-  const ALLOC_META = [
-    { key: 'household',    label: '🏠 Household contribution',  color: '#60A5FA' },
-    { key: 'jointSavings', label: '💰 Capital One Joint Savings', color: '#4ADE80' },
-    { key: 'rothIRA',      label: '📈 Jessica Roth IRA',        color: '#D4AF37' },
-    { key: 'personal',     label: '👩 Personal spending',        color: '#F472B6' },
-  ];
-
-  const fixedExpenses = jSet.fixedExpenses || [];
-  const totalFixed    = fixedExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const totalSavings  = amounts.jointSavings + amounts.rothIRA;
+  const totalFixed   = jessicaFixed.reduce((s, e) => s + (e.amount || 0), 0);
+  const totalSavings = amounts['jessica_alloc_savings'] + amounts['jessica_alloc_roth'];
 
   return (
     <div className="fbp-view">
@@ -356,21 +377,24 @@ function JessicaView({ settings, setSettings, accounts, setAccounts }) {
         <div className="fbp-table">
           <div className="fbp-table-row">
             <span className="fbp-row-label">Estimated monthly income</span>
-            <InlineEdit
-              value={estMonthly}
-              onSave={(v) => updateJessica(['estimatedMonthlyIncome'], v)}
-              formatFn={formatCurrencyFull}
-              className="fbp-ie"
-              suffix="/mo"
-            />
+            <InlineEdit value={estMonthly} onSave={(v) => setSetting('jessica_estimated_monthly', v)}
+              formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
           </div>
           <div className="fbp-table-row fbp-subdued">
             <span>Competitive Edge LLC next payday</span>
-            <InlineEdit value={jSet.nextCEPayday || '2026-04-01'} type="text" onSave={(v) => updateJessica(['nextCEPayday'], v)} formatFn={(v) => v} className="fbp-ie" prefix="" />
+            <span className="fbp-payday">
+              <InlineEdit value={settings['jessica_next_ce_payday'] || '2026-04-01'}
+                onSave={(v) => setSetting('jessica_next_ce_payday', v)}
+                type="text" formatFn={formatPayday} className="fbp-ie" />
+            </span>
           </div>
           <div className="fbp-table-row fbp-subdued">
             <span>Orange Theory next payday</span>
-            <InlineEdit value={jSet.nextOTPayday || '2026-03-27'} type="text" onSave={(v) => updateJessica(['nextOTPayday'], v)} formatFn={(v) => v} className="fbp-ie" prefix="" />
+            <span className="fbp-payday">
+              <InlineEdit value={settings['jessica_next_ot_payday'] || '2026-03-27'}
+                onSave={(v) => setSetting('jessica_next_ot_payday', v)}
+                type="text" formatFn={formatPayday} className="fbp-ie" />
+            </span>
           </div>
         </div>
       </div>
@@ -383,168 +407,147 @@ function JessicaView({ settings, setSettings, accounts, setAccounts }) {
         )}
         <div className="fbp-table fbp-alloc-table">
           <div className="fbp-table-head fbp-alloc-head">
-            <span>Category</span>
-            <span>%</span>
-            <span>~Monthly</span>
+            <span>Category</span><span>%</span><span>~Monthly</span>
           </div>
-          {ALLOC_META.map(({ key, label, color }) => (
+          {JESSICA_ALLOCS.map(({ key, label, color }) => (
             <div key={key} className="fbp-table-row">
               <span className="fbp-row-label" style={{ color }}>{label}</span>
-              <span>
-                <InlineEdit
-                  value={alloc[key] || 0}
-                  onSave={(v) => updateAlloc(key, v)}
-                  formatFn={(v) => `${v}%`}
-                  suffix=""
-                  prefix=""
-                  className="fbp-ie"
-                  step="1"
-                />
-              </span>
+              <InlineEdit value={allocValues[key] ?? 0} onSave={(v) => setSetting(key, v)}
+                formatFn={(v) => `${v}%`} className="fbp-ie" step="1" />
               <span className="fbp-subdued">{formatCurrencyFull(amounts[key])}</span>
+            </div>
+          ))}
+          <div className="fbp-table-row fbp-total-row fbp-subdued">
+            <span>Total</span>
+            <span style={{ color: allocWarning ? '#F87171' : '#4ADE80', fontWeight: 700 }}>{allocTotal}%</span>
+            <span />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fixed Expenses ── */}
+      <div className="fbp-section">
+        <SectionHeader title="Fixed Expenses" icon="📋" total={totalFixed} totalColor="#F87171" />
+        <ExpenseTable
+          expenses={jessicaFixed}
+          onUpdate={updateExpense}
+          onDelete={deleteExpense}
+          onAdd={addExpense}
+        />
+      </div>
+
+      <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalSavings} />
+    </div>
+  );
+}
+
+// ── HOUSEHOLD VIEW — 3-column combined breakdown ──────────────────────────────
+function HouseholdView({ settings, accounts, recurringExpenses }) {
+  const vadimPaycheck   = settings['vadim_paycheck']            ?? 2200;
+  const vadimMonthly    = Math.round((vadimPaycheck * 26) / 12 * 100) / 100;
+  const jessicaMonthly  = settings['jessica_estimated_monthly'] ?? 2000;
+  const totalMonthly    = vadimMonthly + jessicaMonthly;
+
+  const vadimFixed = (recurringExpenses || []).filter((e) => {
+    const meta = e.metadata || {};
+    return !meta.isBudget && meta.owner !== 'jessica' && e.active;
+  });
+  const jessicaFixed = (recurringExpenses || []).filter((e) => {
+    const meta = e.metadata || {};
+    return meta.owner === 'jessica' && e.active;
+  });
+  const vadimFixedTotal    = vadimFixed.reduce((s, e) => s + (e.amount || 0), 0);
+  const jessicaFixedTotal  = jessicaFixed.reduce((s, e) => s + (e.amount || 0), 0);
+  const combinedFixed      = vadimFixedTotal + jessicaFixedTotal;
+
+  const vadimVariable  = VADIM_BUDGETS.reduce((s, b) => s + (settings[b.key] || 0), 0);
+  // Jessica has no variable budget in the system yet (she uses allocations)
+  const combinedVariable = vadimVariable;
+
+  const vadimSavings     = VADIM_SAVINGS.reduce((s, sv) => s + (settings[sv.key] || 0), 0);
+  const jessicaSavPct    = (settings['jessica_alloc_savings'] || 0) + (settings['jessica_alloc_roth'] || 0);
+  const jessicaSavings   = Math.round(jessicaMonthly * jessicaSavPct / 100 * 100) / 100;
+  const combinedSavings  = vadimSavings + jessicaSavings;
+
+  const vadimDisc    = Math.max(0, vadimMonthly  - vadimFixedTotal  - vadimVariable  - vadimSavings);
+  const jessicaDisc  = Math.max(0, jessicaMonthly - jessicaFixedTotal - 0             - jessicaSavings);
+  const combinedDisc = vadimDisc + jessicaDisc;
+
+  const vadimRate    = vadimMonthly   > 0 ? ((vadimSavings   / vadimMonthly)   * 100).toFixed(1) : '0.0';
+  const jessicaRate  = jessicaMonthly > 0 ? ((jessicaSavings / jessicaMonthly) * 100).toFixed(1) : '0.0';
+  const combinedRate = totalMonthly   > 0 ? ((combinedSavings / totalMonthly)  * 100).toFixed(1) : '0.0';
+
+  const totalAssets = (accounts || [])
+    .filter((a) => !['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'].includes(a.type))
+    .reduce((s, a) => s + (a.balance || 0), 0);
+  const totalDebt = (accounts || [])
+    .filter((a) => ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'].includes(a.type))
+    .reduce((s, a) => s + (a.balance || 0), 0);
+
+  const rothVadim       = (accounts || []).find((a) => a.id === 'roth_ira_vadim');
+  const rothJessica     = (accounts || []).find((a) => a.id === 'roth_ira_jessica');
+  const combinedRothYTD = (rothVadim?.ytdContributions || 0) + (rothJessica?.ytdContributions || 0);
+  const rothTarget      = 14000;
+
+  const rows = [
+    { label: 'Income',         vadim: vadimMonthly,    jessica: jessicaMonthly,    combined: totalMonthly,    color: '#4ADE80' },
+    { label: 'Fixed Expenses', vadim: vadimFixedTotal,  jessica: jessicaFixedTotal,  combined: combinedFixed,   color: '#F87171', neg: true },
+    { label: 'Variable Budgets', vadim: vadimVariable,  jessica: 0,                  combined: combinedVariable, color: '#FBBF24', neg: true },
+    { label: 'Savings',        vadim: vadimSavings,    jessica: jessicaSavings,    combined: combinedSavings, color: '#4ADE80', neg: true },
+    { label: 'Discretionary',  vadim: vadimDisc,       jessica: jessicaDisc,       combined: combinedDisc,    color: '#A78BFA', bold: true },
+    { label: 'Savings Rate',   vadim: `${vadimRate}%`, jessica: `${jessicaRate}%`, combined: `${combinedRate}%`, color: '#D4AF37', isRate: true },
+  ];
+
+  return (
+    <div className="fbp-view">
+      {/* 3-column combined table */}
+      <div className="fbp-section">
+        <SectionHeader title="Combined Budget Breakdown" icon="🏠" />
+        <div className="fbp-household-table">
+          <div className="fbp-household-head">
+            <span />
+            <span style={{ color: '#60A5FA' }}>👨 Vadim</span>
+            <span style={{ color: '#F472B6' }}>👩 Jessica</span>
+            <span style={{ color: '#4ADE80' }}>🏠 Combined</span>
+          </div>
+          {rows.map(({ label, vadim, jessica, combined, color, neg, bold, isRate }) => (
+            <div key={label} className={`fbp-household-row ${bold ? 'fbp-total-row' : ''}`}>
+              <span className="fbp-row-label">{label}</span>
+              <span style={{ color: color || undefined }}>
+                {isRate ? vadim : `${neg ? '−' : ''}${typeof vadim === 'number' ? formatCurrencyFull(vadim) : vadim}`}
+              </span>
+              <span style={{ color: color || undefined }}>
+                {isRate ? jessica : `${neg ? '−' : ''}${typeof jessica === 'number' ? formatCurrencyFull(jessica) : jessica}`}
+              </span>
+              <span style={{ color: color || undefined, fontWeight: bold ? 700 : undefined }}>
+                {isRate ? combined : `${neg ? '−' : ''}${typeof combined === 'number' ? formatCurrencyFull(combined) : combined}`}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Fixed Expenses ── */}
-      {fixedExpenses.length > 0 && (
-        <div className="fbp-section">
-          <SectionHeader title="Fixed Expenses" icon="📋" total={totalFixed} totalColor="#F87171" />
-          <div className="fbp-table">
-            {fixedExpenses.map((exp) => (
-              <div key={exp.id} className="fbp-table-row">
-                <span className="fbp-row-label">💳 {exp.name}</span>
-                <InlineEdit
-                  value={exp.amount}
-                  onSave={(v) => {
-                    setSettings((prev) => deepSet(prev, ['jessica', 'fixedExpenses'],
-                      (prev.jessica?.fixedExpenses || []).map((e) => e.id === exp.id ? { ...e, amount: v } : e)
-                    ));
-                  }}
-                  formatFn={formatCurrencyFull}
-                  className="fbp-ie"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Summary ── */}
-      <SummaryBar
-        income={estMonthly}
-        fixed={totalFixed}
-        variable={0}
-        savings={totalSavings}
-      />
-    </div>
-  );
-}
-
-// ── HOUSEHOLD VIEW ─────────────────────────────────────────────────────
-function HouseholdView({ settings, accounts }) {
-  const vSet = settings.vadim   || {};
-  const jSet = settings.jessica || {};
-
-  const vadimPaycheck    = vSet.paycheck || VADIM_PAYCHECK;
-  const vadimMonthly     = Math.round((vadimPaycheck * 26) / 12 * 100) / 100;
-  const jessicaMonthly   = jSet.estimatedMonthlyIncome || 2000;
-  const totalMonthly     = vadimMonthly + jessicaMonthly;
-
-  const vadimSavings     = Object.values(vSet.savings || {}).reduce((s, sv) => s + (sv?.monthly || 0), 0);
-  const jessicaAllocMonthly = jessicaMonthly * ((jSet.allocations?.jointSavings || 0) + (jSet.allocations?.rothIRA || 0)) / 100;
-  const totalSavings     = vadimSavings + jessicaAllocMonthly;
-
-  const totalNetWorth    = (accounts || [])
-    .filter((a) => !['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'].includes(a.type))
-    .reduce((s, a) => s + (a.balance || 0), 0);
-  const totalDebt        = (accounts || [])
-    .filter((a) => ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'].includes(a.type))
-    .reduce((s, a) => s + (a.balance || 0), 0);
-
-  const vadimSavingsRate  = vadimMonthly  > 0 ? ((vadimSavings / vadimMonthly) * 100).toFixed(1) : '0.0';
-  const jessicaSavingsRate= jessicaMonthly > 0 ? ((jessicaAllocMonthly / jessicaMonthly) * 100).toFixed(1) : '0.0';
-  const combinedRate      = totalMonthly > 0 ? ((totalSavings / totalMonthly) * 100).toFixed(1) : '0.0';
-
-  const rothVadim   = (accounts || []).find((a) => a.id === 'roth_ira_vadim');
-  const rothJessica = (accounts || []).find((a) => a.id === 'roth_ira_jessica');
-  const combinedRothYTD = (rothVadim?.ytdContributions || 0) + (rothJessica?.ytdContributions || 0);
-  const rothTarget  = 14000;
-
-  return (
-    <div className="fbp-view">
-      <div className="fbp-section">
-        <SectionHeader title="Combined Income" icon="🏠" total={totalMonthly} totalColor="#4ADE80" />
-        <div className="fbp-table">
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">👨 Vadim (bi-weekly × 26/12)</span>
-            <span className="positive">{formatCurrencyFull(vadimMonthly)}</span>
-          </div>
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">👩 Jessica (estimated)</span>
-            <span className="positive">{formatCurrencyFull(jessicaMonthly)}</span>
-          </div>
-          <div className="fbp-table-row fbp-total-row">
-            <span>Total Household Income</span>
-            <span className="positive fbp-bold">{formatCurrencyFull(totalMonthly)}</span>
-          </div>
-        </div>
-      </div>
-
+      {/* Net Worth */}
       <div className="fbp-section">
         <SectionHeader title="Net Worth Snapshot" icon="💎" />
         <div className="fbp-table">
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">Total Assets</span>
-            <span className="positive">{formatCurrencyFull(totalNetWorth)}</span>
-          </div>
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">Total Debt</span>
-            <span className="negative">−{formatCurrencyFull(totalDebt)}</span>
-          </div>
+          <div className="fbp-table-row"><span className="fbp-row-label">Total Assets</span><span className="positive">{formatCurrencyFull(totalAssets)}</span></div>
+          <div className="fbp-table-row"><span className="fbp-row-label">Total Debt</span><span className="negative">−{formatCurrencyFull(totalDebt)}</span></div>
           <div className="fbp-table-row fbp-total-row">
             <span>Net Worth</span>
-            <span className={totalNetWorth - totalDebt >= 0 ? 'positive fbp-bold' : 'negative fbp-bold'}>
-              {formatCurrencyFull(totalNetWorth - totalDebt)}
+            <span className={totalAssets - totalDebt >= 0 ? 'positive fbp-bold' : 'negative fbp-bold'}>
+              {formatCurrencyFull(totalAssets - totalDebt)}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="fbp-section">
-        <SectionHeader title="Savings Rate Comparison" icon="📊" />
-        <div className="fbp-table">
-          {[
-            { label: '👨 Vadim',    rate: vadimSavingsRate,    savings: vadimSavings,         color: '#60A5FA' },
-            { label: '👩 Jessica',  rate: jessicaSavingsRate,  savings: jessicaAllocMonthly,  color: '#F472B6' },
-            { label: '🏠 Combined', rate: combinedRate,         savings: totalSavings,         color: '#4ADE80' },
-          ].map(({ label, rate, savings, color }) => (
-            <div key={label} className="fbp-table-row">
-              <span className="fbp-row-label">{label}</span>
-              <div className="fbp-rate-wrap">
-                <div className="fbp-rate-bar-track">
-                  <div className="fbp-rate-bar-fill" style={{ width: `${Math.min(Number(rate), 100)}%`, background: color }} />
-                </div>
-                <span style={{ color, fontWeight: 700, minWidth: 44 }}>{rate}%</span>
-                <span className="fbp-subdued">{formatCurrencyFull(savings)}/mo</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {/* Combined Roth */}
       <div className="fbp-section">
         <SectionHeader title="Combined Roth IRA (2025)" icon="📈" />
         <div className="fbp-table">
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">YTD Contributed</span>
-            <span style={{ color: '#D4AF37' }}>{formatCurrencyFull(combinedRothYTD)}</span>
-          </div>
-          <div className="fbp-table-row">
-            <span className="fbp-row-label">Annual Limit (2 people)</span>
-            <span>{formatCurrencyFull(rothTarget)}</span>
-          </div>
+          <div className="fbp-table-row"><span className="fbp-row-label">YTD Contributed</span><span style={{ color: '#D4AF37' }}>{formatCurrencyFull(combinedRothYTD)}</span></div>
+          <div className="fbp-table-row"><span className="fbp-row-label">Annual Limit (2 people)</span><span>{formatCurrencyFull(rothTarget)}</span></div>
           <div className="fbp-table-row fbp-total-row">
             <span>Remaining (deadline Apr 15, 2026)</span>
             <span style={{ color: '#F87171' }}>{formatCurrencyFull(Math.max(0, rothTarget - combinedRothYTD))}</span>
@@ -555,16 +558,20 @@ function HouseholdView({ settings, accounts }) {
         </div>
       </div>
 
+      {/* Joint contributions */}
       <div className="fbp-section">
         <SectionHeader title="Joint Contributions" icon="🤝" />
         <div className="fbp-table">
           <div className="fbp-table-row">
             <span className="fbp-row-label">Capital One Joint Savings</span>
-            <span>{formatCurrencyFull((vSet.savings?.cap1_joint_savings?.monthly || 0) + (jessicaMonthly * (jSet.allocations?.jointSavings || 0) / 100))}/mo</span>
+            <span>{formatCurrencyFull(
+              (settings['vadim_savings_cap1_monthly'] || 0) +
+              Math.round(jessicaMonthly * (settings['jessica_alloc_savings'] || 0) / 100 * 100) / 100
+            )}/mo</span>
           </div>
           <div className="fbp-table-row">
             <span className="fbp-row-label">Ameriprise Joint Brokerage</span>
-            <span>{formatCurrencyFull(vSet.savings?.brokerage_joint?.monthly || 0)}/mo</span>
+            <span>{formatCurrencyFull(settings['vadim_savings_brokerage_monthly'] || 0)}/mo</span>
           </div>
         </div>
       </div>
@@ -572,12 +579,16 @@ function HouseholdView({ settings, accounts }) {
   );
 }
 
-// ── MAIN PANEL ─────────────────────────────────────────────────────────
+// ── MAIN PANEL ────────────────────────────────────────────────────────────────
 export default function FullBudgetPlanPanel() {
-  const [settings, setSettings]               = useLocalStorage('budget_settings',           DEFAULT_BUDGET_SETTINGS);
-  const [accounts, setAccounts]               = useLocalStorage('budget_accounts',            DEFAULT_ACCOUNTS);
+  const [settings, setSettings]   = useLocalStorage('budget_settings',           DEFAULT_BUDGET_SETTINGS);
+  const [accounts, setAccounts]   = useLocalStorage('budget_accounts',            DEFAULT_ACCOUNTS);
   const [recurringExpenses, setRecurringExpenses] = useLocalStorage('budget_recurring_expenses', DEFAULT_RECURRING_EXPENSES);
-  const [activeTab, setActiveTab]             = useState('vadim');
+  const [activeTab, setActiveTab] = useState('vadim');
+
+  const setSetting = (key, value) => {
+    setSettings((prev) => ({ ...(prev || {}), [key]: value }));
+  };
 
   const TABS = [
     { id: 'vadim',     label: '👨 Vadim'     },
@@ -589,36 +600,26 @@ export default function FullBudgetPlanPanel() {
     <div className="fbp-container">
       <div className="fbp-tab-bar">
         {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`fbp-tab ${activeTab === t.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
+          <button key={t.id} className={`fbp-tab ${activeTab === t.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(t.id)}>{t.label}</button>
         ))}
       </div>
 
       {activeTab === 'vadim' && (
         <VadimView
-          settings={settings}
-          setSettings={setSettings}
-          accounts={accounts}
-          setAccounts={setAccounts}
-          recurringExpenses={recurringExpenses}
-          setRecurringExpenses={setRecurringExpenses}
+          settings={settings || {}} setSetting={setSetting}
+          accounts={accounts}       setAccounts={setAccounts}
+          recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses}
         />
       )}
       {activeTab === 'jessica' && (
         <JessicaView
-          settings={settings}
-          setSettings={setSettings}
-          accounts={accounts}
-          setAccounts={setAccounts}
+          settings={settings || {}} setSetting={setSetting}
+          recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses}
         />
       )}
       {activeTab === 'household' && (
-        <HouseholdView settings={settings} accounts={accounts} />
+        <HouseholdView settings={settings || {}} accounts={accounts} recurringExpenses={recurringExpenses} />
       )}
     </div>
   );

@@ -85,7 +85,7 @@ export const DEFAULT_RECURRING_EXPENSES = [
     frequency: 'monthly',
     startDate: '2026-03-01',
     active: true,
-    metadata: { sourceAccount: 'Capital One Checking', tag: 'fixed' },
+    metadata: { sourceAccount: 'Wells Fargo Checking (Jessica)', tag: 'fixed', owner: 'jessica' },
   },
 
   // ── One-Time ─────────────────────────────────────────────────────────

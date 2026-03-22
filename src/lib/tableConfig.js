@@ -367,12 +367,46 @@ export const TABLE_CONFIG = {
     sync: (_, next) => syncStateItem('paid_cc_payments', next),
     realtimeTable: 'app_state',
   },
-  // Central budget settings (single source of truth for all plan numbers)
+  // Central budget settings — flat KV table (one Supabase row per setting key)
   budget_settings: {
-    type: 'state', stateKey: 'budget_settings',
-    load: (key, def) => loadStateItem('budget_settings', key, def),
-    sync: (_, next) => syncStateItem('budget_settings', next),
-    realtimeTable: 'app_state',
+    type: 'flat_kv',
+    table: 'budget_settings',
+    realtimeTable: 'budget_settings',
+    load: async (_key, def) => {
+      const { data, error } = await supabase.from('budget_settings').select('*');
+      if (error) throw error;
+      const defaults = typeof def === 'function' ? def() : (def || {});
+      if (!data || data.length === 0) return defaults;
+      // Merge DB rows on top of defaults so any missing keys stay filled in
+      const obj = { ...defaults };
+      for (const row of data) {
+        obj[row.key] = (row.value !== null && row.value !== undefined)
+          ? Number(row.value)
+          : row.text_value;
+      }
+      return obj;
+    },
+    sync: async (prev, next) => {
+      if (!next) return;
+      const prevObj = prev || {};
+      const upserts = [];
+      for (const k of Object.keys(next)) {
+        if (prevObj[k] !== next[k]) {
+          const val = next[k];
+          upserts.push({
+            key: k,
+            value:      typeof val === 'number' ? val : null,
+            text_value: typeof val === 'string' ? val : null,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      if (upserts.length === 0) return;
+      const { error } = await supabase
+        .from('budget_settings')
+        .upsert(upserts, { onConflict: 'key' });
+      if (error) throw error;
+    },
   },
   // Variable bill entries (electricity, water) — keyed by `expenseId_YYYY-MM`
   budget_variable_bill_entries: {

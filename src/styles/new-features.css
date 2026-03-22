@@ -2167,9 +2167,82 @@ input, select, textarea {
 .fbp-expenses-table .fbp-table-head,
 .fbp-expenses-table .fbp-table-row {
   display: grid;
-  grid-template-columns: 1fr auto 60px;
+  grid-template-columns: 1fr auto 60px 28px;
+  align-items: center;
 }
 .fbp-col-due { font-size: 12px; color: #64748B; text-align: right; }
+
+/* Delete button on expense rows */
+.fbp-delete-btn {
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.fbp-expenses-table .fbp-table-row:hover .fbp-delete-btn { opacity: 1; }
+.fbp-delete-btn:hover { color: #F87171; }
+
+/* Add expense row */
+.fbp-add-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px dashed #1E293B;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.fbp-add-input {
+  background: #0F172A;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #F1F5F9;
+  font-size: 13px;
+  padding: 5px 8px;
+  outline: none;
+}
+.fbp-add-input:focus { border-color: #3B82F6; }
+.fbp-add-name   { flex: 1; min-width: 120px; }
+.fbp-add-amount { width: 80px; }
+.fbp-add-due    { width: 60px; }
+.fbp-add-confirm {
+  background: #22C55E22;
+  border: 1px solid #22C55E;
+  border-radius: 6px;
+  color: #22C55E;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.fbp-add-cancel {
+  background: none;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #64748B;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.fbp-add-btn {
+  background: none;
+  border: 1px dashed #334155;
+  border-radius: 6px;
+  color: #64748B;
+  font-size: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+  margin: 8px 14px;
+  width: calc(100% - 28px);
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+.fbp-add-btn:hover { border-color: #4ADE80; color: #4ADE80; }
+
+.fbp-ie-name .ie-value { font-weight: 500; }
 
 .fbp-savings-head,
 .fbp-savings-row {
@@ -2293,3 +2366,79 @@ input, select, textarea {
 .goal-reached   { background: rgba(74,222,128,0.15); color: #4ADE80; font-size: 13px; }
 .goal-no-contrib{ background: rgba(100,116,139,0.12); color: #64748B; }
 .goal-proj-date { font-size: 11px; color: #475569; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SYNC STATUS BAR
+   ═══════════════════════════════════════════════════════════════════════ */
+.sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.sync-bar.sync-ok    { color: #4ADE80; }
+.sync-bar.sync-saving{ color: #FBBF24; }
+.sync-bar.sync-error { color: #F87171; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3); }
+.sync-key { opacity: 0.65; margin-left: 4px; }
+
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.sync-dot-ok   { background: #4ADE80; }
+.sync-dot-err  { background: #F87171; }
+.sync-dot-pulse {
+  background: #FBBF24;
+  animation: syncPulse 0.8s ease-in-out infinite;
+}
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BUDGET PLAN — HOUSEHOLD 3-COLUMN TABLE
+   ═══════════════════════════════════════════════════════════════════════ */
+.fbp-household-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.fbp-household-head,
+.fbp-household-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #0F1A2E;
+  font-size: 13px;
+  align-items: center;
+}
+.fbp-household-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fbp-household-row:last-child { border-bottom: none; }
+.fbp-household-row > span:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BUDGET PLAN — EMPTY STATE & PAYDAY FORMAT
+   ═══════════════════════════════════════════════════════════════════════ */
+.fbp-empty-row {
+  padding: 16px 14px;
+  color: #475569;
+  font-size: 13px;
+  font-style: italic;
+}
+.fbp-payday .ie-value {
+  color: #60A5FA;
+  font-size: 12px;
+}

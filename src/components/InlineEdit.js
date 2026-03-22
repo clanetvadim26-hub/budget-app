@@ -32,12 +32,12 @@ export default function InlineEdit({
 
   const commit = () => {
     setEditing(false);
-    const parsed = type === 'number' ? Number(draft) : draft;
-    if (parsed !== value) {
-      onSave(parsed);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1600);
-    }
+    const parsed = type === 'number' ? Number(draft) : draft.trim();
+    // Always call onSave — let the store decide if anything changed.
+    // Guards here cause silent no-ops that confuse users.
+    onSave(parsed);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1600);
   };
 
   const handleKey = (e) => {
