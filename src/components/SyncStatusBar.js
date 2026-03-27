@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSyncStatus } from '../hooks/useLocalStorage';
+import { useSyncStatus, retrySyncAll } from '../hooks/useLocalStorage';
 
 function timeAgo(date) {
   if (!date) return null;
@@ -25,8 +25,8 @@ export default function SyncStatusBar() {
     return (
       <div className="sync-bar sync-error">
         <span className="sync-dot sync-dot-err" />
-        Save failed — check Supabase connection
-        <span className="sync-key">{error}</span>
+        <span>Unsaved changes — {error}</span>
+        <button className="sync-retry-btn" onClick={() => retrySyncAll()}>Retry Sync</button>
       </div>
     );
   }

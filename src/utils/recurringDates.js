@@ -26,10 +26,10 @@ export function getRecurringDates(startDate, frequency, endDate) {
 
 // Returns paychecks that are pending confirmation:
 // - occurred within the last 30 days and not yet confirmed
-// - OR occur within the next 3 days and not yet confirmed
+// - OR occur within the next 2 days (popup appears 2 days before payday)
 export function getPendingPaychecks(recurringIncomes, confirmedPaychecks) {
   const today = new Date();
-  const lookAhead = addDays(today, 3);
+  const lookAhead = addDays(today, 2);
   const lookBack = addDays(today, -30);
   const pending = [];
 

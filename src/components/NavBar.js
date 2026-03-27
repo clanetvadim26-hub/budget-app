@@ -7,14 +7,14 @@ const NAV_ITEMS = [
   { id: 'calendar',     label: 'Calendar',     icon: '📅' },
   { id: 'expenses',     label: 'Expenses',     icon: '📉' },
   { id: 'cashflow',     label: 'Cash Flow',    icon: '📈' },
-  { id: 'savings',      label: 'Savings',      icon: '🏦' },
   { id: 'accounts',     label: 'Accounts',     icon: '💳' },
   { id: 'moneyflow',    label: 'Money Flow',   icon: '🔀' },
   { id: 'investments',  label: 'Investments',  icon: '💼' },
   { id: 'debt',         label: 'Debt',         icon: '🔴' },
-  { id: 'recurring',    label: 'Recurring',    icon: '🔄' },
+  { id: 'calculators',  label: 'Calculators',  icon: '🧮' },
   { id: 'add-expense',  label: 'Add Expense',  icon: '➕' },
   { id: 'add-income',   label: 'Add Income',   icon: '💵' },
+  { id: 'paycheck',     label: 'Paycheck',     icon: '💸' },
   { id: 'advice',       label: 'Advice',       icon: '💡' },
 ];
 

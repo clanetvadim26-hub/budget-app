@@ -1,17 +1,22 @@
 import React from 'react';
 import CashFlowLineChart from '../charts/CashFlowLineChart';
-import { formatCurrency } from '../../utils/calculations';
+import { formatCurrency, getCashFlowDataFromDate } from '../../utils/calculations';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
-export default function CashFlowPanel({ chartData }) {
-  const avgIncome = chartData.reduce((s, d) => s + d.income, 0) / (chartData.length || 1);
+export default function CashFlowPanel() {
+  const [expenses] = useLocalStorage('budget_expenses', []);
+  const [incomes]  = useLocalStorage('budget_incomes',  []);
+
+  const chartData   = getCashFlowDataFromDate(incomes, expenses, '2026-03-01');
+  const avgIncome   = chartData.reduce((s, d) => s + d.income,   0) / (chartData.length || 1);
   const avgExpenses = chartData.reduce((s, d) => s + d.expenses, 0) / (chartData.length || 1);
-  const avgNet = avgIncome - avgExpenses;
+  const avgNet      = avgIncome - avgExpenses;
 
   return (
     <div className="panel">
       <div className="panel-header">
         <h2>Cash Flow Timeline</h2>
-        <span className="panel-subtitle">Last 6 Months</span>
+        <span className="panel-subtitle">Since March 2026</span>
       </div>
 
       <div className="cashflow-summary">

@@ -38,7 +38,7 @@ function GoalProjection({ balance, targetGoal, monthlyContribution }) {
 const TYPE_GROUPS = {
   'Checking & Savings': ['checking', 'savings', 'money_market', 'cd'],
   'Credit & Loans':     ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'],
-  'Retirement':         ['roth_ira', 'traditional_ira', '401k', '403b', 'hsa'],
+  'Retirement':         ['roth_ira', 'traditional_ira', '401k', 'roth_401k', '403b', 'hsa'],
   'Investment':         ['brokerage', 'reit', 'crypto'],
 };
 const FLOW_TYPES = [
@@ -71,8 +71,10 @@ function UtilizationBar({ balance, creditLimit }) {
   );
 }
 
-function AccountCard({ account, onSave, onDelete }) {
+function AccountCard({ account, settings = {}, onSave, onDelete }) {
   const isCC = account.type === 'credit';
+  const isInvestment = ACCOUNT_TYPE_META[account.type]?.isInvestment || false;
+  const planContrib = isInvestment ? Number(settings[`contrib_${account.id}`] || 0) : null;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     balance:            account.balance            || 0,
@@ -152,8 +154,11 @@ function AccountCard({ account, onSave, onDelete }) {
         </div>
       )}
 
-      {account.monthlyContribution > 0 && !isCC && (
-        <div className="account-contrib">+{formatCurrency(account.monthlyContribution)}/mo contribution</div>
+      {(account.monthlyContribution > 0 || (isInvestment && planContrib > 0)) && !isCC && (
+        <div className="account-contrib">
+          +{formatCurrency(isInvestment ? (planContrib || account.monthlyContribution) : account.monthlyContribution)}/mo contribution
+          {isInvestment && <span className="contrib-plan-note"> (Budget Plan)</span>}
+        </div>
       )}
 
       {!editing ? (
@@ -172,6 +177,14 @@ function AccountCard({ account, onSave, onDelete }) {
               <div className="form-group">
                 <label>Credit Limit ($)</label>
                 <input type="number" min="0" step="1" value={form.creditLimit} onChange={(e) => f('creditLimit', e.target.value)} />
+              </div>
+            ) : isInvestment ? (
+              <div className="form-group">
+                <label>Monthly Contribution</label>
+                <div className="contrib-readonly">
+                  {formatCurrency(planContrib || form.monthlyContribution)}/mo
+                  <span className="contrib-readonly-note">set in Budget Plan</span>
+                </div>
               </div>
             ) : (
               <div className="form-group">
@@ -477,6 +490,7 @@ const GROUP_LABELS = { liquid: 'Checking & Savings', liability: 'Credit Cards & 
 
 export default function AccountsPanel() {
   const [accounts, setAccounts] = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
+  const [settings]              = useLocalStorage('budget_settings', {});
   const [netWorthHistory, setNetWorthHistory] = useLocalStorage('budget_networth_history', []);
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -594,7 +608,7 @@ export default function AccountsPanel() {
             </div>
             <div className="accounts-grid">
               {grouped[group].map((account) => (
-                <AccountCard key={account.id} account={account} onSave={saveAccount} onDelete={deleteAccount} />
+                <AccountCard key={account.id} account={account} settings={settings} onSave={saveAccount} onDelete={deleteAccount} />
               ))}
             </div>
           </div>
@@ -604,6 +618,12 @@ export default function AccountsPanel() {
       <div style={{ textAlign: 'center', marginTop: 8 }}>
         <button className="btn-add-account" onClick={() => setShowAddForm(!showAddForm)}>
           {showAddForm ? 'Cancel' : '+ Add Account'}
+        </button>
+        <button
+          className="btn-rerun-setup"
+          onClick={() => { window.localStorage.removeItem('budget_setup_complete'); window.location.reload(); }}
+        >
+          ↺ Re-run Setup Wizard
         </button>
       </div>
     </div>

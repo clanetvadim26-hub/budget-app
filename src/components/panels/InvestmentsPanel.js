@@ -4,6 +4,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/accounts';
 import { formatCurrency } from '../../utils/calculations';
 import RetirementDetailDrawer from '../RetirementDetailDrawer';
+import K401DetailPanel from './K401DetailPanel';
 import {
   ROTH_YEARS, deadlineLabel, daysUntilDeadline,
   getRothLimit, getTotalContributed, getYearStatus, YEAR_STATUS_META,
@@ -96,21 +97,23 @@ function RothAccountBar({ account, contributions, selectedYear, onOpenDrawer }) 
   );
 }
 
-const INVESTMENT_TYPES = ['roth_ira', 'traditional_ira', '401k', '403b', 'hsa', 'brokerage', 'reit', 'crypto'];
+const INVESTMENT_TYPES = ['roth_ira', 'traditional_ira', '401k', 'roth_401k', '403b', 'hsa', 'brokerage', 'reit', 'crypto'];
 const DONUT_COLORS = {
-  'Roth IRA': '#D4AF37', 'Traditional IRA': '#C9A227', '401k': '#A78BFA', '403b': '#8B5CF6',
+  'Roth IRA': '#D4AF37', 'Traditional IRA': '#C9A227', '401k': '#A78BFA', 'Roth 401k': '#7C3AED', '403b': '#8B5CF6',
   HSA: '#2DD4BF', Brokerage: '#38BDF8', REIT: '#FB923C', Crypto: '#F59E0B',
 };
 
 export default function InvestmentsPanel() {
   const [accounts]      = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
   const [contributions] = useLocalStorage('budget_roth_contributions', []);
+  const [settings]      = useLocalStorage('budget_settings', {});
   const [selectedYear,  setSelectedYear]      = useState(defaultRothYear());
   const [drawerAccountId, setDrawerAccountId] = useState(null);
+  const [k401DrawerId, setK401DrawerId]       = useState(null);
 
   const iraAccounts     = accounts.filter((a) => a.type === 'roth_ira' || a.type === 'traditional_ira');
   const rothAccounts    = accounts.filter((a) => a.type === 'roth_ira');
-  const k401Accounts    = accounts.filter((a) => a.type === '401k' || a.type === '403b');
+  const k401Accounts    = accounts.filter((a) => a.type === '401k' || a.type === '403b' || a.type === 'roth_401k');
   const taxableAccounts = accounts.filter((a) => ['brokerage', 'reit', 'crypto', 'hsa'].includes(a.type));
 
   const totalInvested = accounts
@@ -257,23 +260,24 @@ export default function InvestmentsPanel() {
           <div className="panel-header"><h2>401k / 403b Accounts</h2></div>
           <div className="roth-individual">
             {k401Accounts.map((a) => {
-              const ownerColor = OWNER_COLORS[a.owner] || '#94A3B8';
-              const meta       = ACCOUNT_TYPE_META[a.type] || {};
-              const nodeColor  = a.color || meta.color || '#A78BFA';
-              const ytd        = a.ytdContributions || 0;
-              const target     = a.annualTarget || 0;
-              const pct        = target > 0 ? Math.min((ytd / target) * 100, 100) : 0;
+              const ownerColor   = OWNER_COLORS[a.owner] || '#94A3B8';
+              const meta         = ACCOUNT_TYPE_META[a.type] || {};
+              const nodeColor    = a.color || meta.color || '#A78BFA';
+              const ytd          = a.ytdContributions || 0;
+              const target       = a.annualTarget || 0;
+              const pct          = target > 0 ? Math.min((ytd / target) * 100, 100) : 0;
+              const planContrib  = Number(settings[`contrib_${a.id}`] || a.monthlyContribution || 0);
               return (
                 <TrackerCard
                   key={a.id}
                   icon={meta.icon || '🏛️'}
                   title={a.name}
                   color={ownerColor}
-                  onClick={() => setDrawerAccountId(a.id)}
+                  onClick={() => setK401DrawerId(a.id)}
                 >
                   <StatRow label="Current Balance" value={formatCurrency(a.balance || 0)} />
                   <StatRow label="YTD Contributions" value={formatCurrency(ytd)} valueColor={nodeColor} />
-                  <StatRow label="Monthly Contribution" value={`${formatCurrency(a.monthlyContribution || 0)}/mo`} />
+                  <StatRow label="Monthly Contribution" value={`${formatCurrency(planContrib)}/mo`} />
                   {target > 0 && (
                     <>
                       <StatRow label="Annual Target" value={formatCurrency(target)} />
@@ -300,11 +304,12 @@ export default function InvestmentsPanel() {
               const totalContr = a.totalContributed || 0;
               const returnAmt  = (a.balance || 0) - totalContr;
               const returnPct  = totalContr > 0 ? (returnAmt / totalContr) * 100 : 0;
+              const planContrib2 = Number(settings[`contrib_${a.id}`] || a.monthlyContribution || 0);
               return (
                 <TrackerCard key={a.id} icon={meta.icon || '💼'} title={a.name} color={nodeColor}>
                   <StatRow label="Current Balance" value={formatCurrency(a.balance || 0)} />
                   <StatRow label="Total Contributed" value={formatCurrency(totalContr)} />
-                  <StatRow label="Monthly Contribution" value={`${formatCurrency(a.monthlyContribution || 0)}/mo`} />
+                  <StatRow label="Monthly Contribution" value={`${formatCurrency(planContrib2)}/mo`} />
                   {totalContr > 0 && (
                     <StatRow
                       label="Return"
@@ -319,13 +324,32 @@ export default function InvestmentsPanel() {
         </div>
       )}
 
-      {/* ── Retirement Detail Drawer ─────────────────────────────────── */}
+      {/* ── Retirement Detail Drawer (IRA) ──────────────────────────────── */}
       {drawerAccount && (
         <RetirementDetailDrawer
           account={drawerAccount}
           onClose={() => setDrawerAccountId(null)}
         />
       )}
+
+      {/* ── 401k / Roth 401k Detail Overlay ─────────────────────────────── */}
+      {k401DrawerId && (() => {
+        const k401Acct = accounts.find((a) => a.id === k401DrawerId);
+        if (!k401Acct) return null;
+        return (
+          <div className="rdr-overlay" onClick={() => setK401DrawerId(null)}>
+            <div className="rdr-drawer" onClick={(e) => e.stopPropagation()}>
+              <button className="rdr-close-btn" onClick={() => setK401DrawerId(null)}>✕</button>
+              <K401DetailPanel
+                accountId={k401Acct.id}
+                accountName={k401Acct.name}
+                accountType={k401Acct.type}
+                owner={k401Acct.owner}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

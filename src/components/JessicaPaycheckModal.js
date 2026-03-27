@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { formatCurrencyFull } from '../utils/calculations';
 import { calcJessicaAllocation, getJessicaMessage } from '../utils/paycheckAllocation';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const JOB_META = {
   orange_theory:    { label: 'Orange Theory',         icon: '🏋️', color: '#FB923C' },
@@ -24,8 +25,18 @@ export default function JessicaPaycheckModal({ paycheckItem, onConfirm, onClose 
     setStep('review');
   };
 
+  const [, setDeferredPaychecks] = useLocalStorage('budget_deferred_paychecks', {});
+
   const handleConfirm = () => {
     onConfirm(paycheckItem, Number(amount));
+  };
+
+  const handleDefer = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const deferUntil = tomorrow.toISOString().slice(0, 10);
+    setDeferredPaychecks((prev) => ({ ...prev, [paycheckItem.key]: { deferUntil } }));
+    onClose();
   };
 
   return (
@@ -74,6 +85,9 @@ export default function JessicaPaycheckModal({ paycheckItem, onConfirm, onClose 
                 See My Allocation →
               </button>
               <button className="pa-skip-btn" onClick={onClose}>Remind Me Later</button>
+              <button className="paycheck-defer-btn" onClick={handleDefer}>
+                ❌ Not Paid Yet — Ask Me Tomorrow
+              </button>
             </div>
           </div>
         )}
@@ -130,6 +144,9 @@ export default function JessicaPaycheckModal({ paycheckItem, onConfirm, onClose 
                 ✓ Confirm & Post Income
               </button>
               <button className="pa-skip-btn" onClick={() => setStep('enter')}>← Edit Amount</button>
+              <button className="paycheck-defer-btn" onClick={handleDefer}>
+                ❌ Not Paid Yet — Ask Me Tomorrow
+              </button>
             </div>
           </>
         )}

@@ -19,6 +19,10 @@ const DATA_LOADED = new Set();
 const DATA_LISTENERS = {};
 // key → supabase realtime channel
 const RT_CHANNELS = {};
+// keys written to by setValue() since last Supabase load
+const DATA_DIRTY = new Set();
+// key → timestamp of last successful Supabase load
+const DATA_LAST_SYNC = {};
 
 // ── Global sync status ──────────────────────────────────────────────────────
 // Tracks the last successful save time and any current error across ALL keys.
@@ -54,6 +58,15 @@ function broadcast(key, value) {
   }
 }
 
+async function withRetry(fn, attempts = 3, delayMs = 2000) {
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); } catch (err) {
+      if (i === attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
 /** Load from Supabase once per key; set up one realtime subscription. */
 function initSupabase(key, config, defaultValue) {
   if (DATA_LOADED.has(key)) return;
@@ -62,10 +75,23 @@ function initSupabase(key, config, defaultValue) {
   // ── Load ──────────────────────────────────────────────────────────────
   config.load(key, defaultValue)
     .then((loaded) => {
-      DATA_STORE[key] = loaded;
-      window.localStorage.setItem(key, JSON.stringify(loaded));
-      broadcast(key, loaded);
-      console.log(`[Supabase load: ${key}] ✓ loaded`, Array.isArray(loaded) ? `${loaded.length} rows` : typeof loaded);
+      // If the user has made local changes since page load, push local TO Supabase
+      if (DATA_DIRTY.has(key)) {
+        const localData = DATA_STORE[key];
+        withRetry(() => config.sync(loaded, localData), 3, 2000)
+          .then(() => {
+            DATA_DIRTY.delete(key);
+            DATA_LAST_SYNC[key] = Date.now();
+            console.log(`[Supabase load: ${key}] ✓ pushed local→remote (dirty)`);
+          })
+          .catch((err) => console.warn(`[Supabase load: ${key}] ✗ push failed`, err?.message || err));
+      } else {
+        DATA_STORE[key] = loaded;
+        window.localStorage.setItem(key, JSON.stringify(loaded));
+        broadcast(key, loaded);
+        DATA_LAST_SYNC[key] = Date.now();
+        console.log(`[Supabase load: ${key}] ✓ loaded`, Array.isArray(loaded) ? `${loaded.length} rows` : typeof loaded);
+      }
     })
     .catch((err) => {
       DATA_LOADED.delete(key); // allow retry on next mount
@@ -158,6 +184,7 @@ export function useLocalStorage(key, initialValue) {
 
     // Synchronously update store + all listeners — no data loss on tab switch
     DATA_STORE[key] = next;
+    DATA_DIRTY.add(key);
     window.localStorage.setItem(key, JSON.stringify(next));
     broadcast(key, next);
 
@@ -167,8 +194,9 @@ export function useLocalStorage(key, initialValue) {
       broadcastSyncStatus();
 
       const t0 = Date.now();
-      config.sync(prev, next)
+      withRetry(() => config.sync(prev, next), 3, 2000)
         .then(() => {
+          DATA_DIRTY.delete(key);
           SYNC_STATUS.saving   = false;
           SYNC_STATUS.lastSaved = new Date();
           SYNC_STATUS.error    = null;
@@ -187,4 +215,28 @@ export function useLocalStorage(key, initialValue) {
   }, [key, config]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return [state, setValue];
+}
+
+/**
+ * Retry syncing all dirty keys to Supabase.
+ * Called by the "Retry Sync" button in SyncStatusBar.
+ */
+export async function retrySyncAll() {
+  const { TABLE_CONFIG } = await import('../lib/tableConfig');
+  for (const key of Array.from(DATA_DIRTY)) {
+    const config = TABLE_CONFIG[key];
+    if (!config) continue;
+    const current = DATA_STORE[key];
+    try {
+      await withRetry(() => config.sync(current, current), 3, 2000);
+      DATA_DIRTY.delete(key);
+      DATA_LAST_SYNC[key] = Date.now();
+      SYNC_STATUS.error    = null;
+      SYNC_STATUS.errorKey = null;
+      SYNC_STATUS.lastSaved = new Date();
+      broadcastSyncStatus();
+    } catch (err) {
+      console.error(`[retrySyncAll: ${key}] ✗`, err);
+    }
+  }
 }

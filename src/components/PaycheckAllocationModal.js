@@ -5,6 +5,7 @@ import { formatCurrencyFull } from '../utils/calculations';
 import {
   calcVadimAllocation, getVadimMessage,
 } from '../utils/paycheckAllocation';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const SLICE_COLORS = {
   bills:        '#F87171',
@@ -55,8 +56,18 @@ export default function PaycheckAllocationModal({ paycheckItem, recurringExpense
     { name: 'Discretionary',  value: alloc.discretionary,          color: SLICE_COLORS.discretionary },
   ].filter(Boolean).filter((d) => d.value > 0);
 
+  const [, setDeferredPaychecks] = useLocalStorage('budget_deferred_paychecks', {});
+
   const handleConfirm = () => {
     onConfirm(paycheckItem);
+  };
+
+  const handleDefer = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const deferUntil = tomorrow.toISOString().slice(0, 10);
+    setDeferredPaychecks((prev) => ({ ...prev, [paycheckItem.key]: { deferUntil } }));
+    onClose();
   };
 
   return (
@@ -218,6 +229,9 @@ export default function PaycheckAllocationModal({ paycheckItem, recurringExpense
             ✓ Confirm & Post Income
           </button>
           <button className="pa-skip-btn" onClick={onClose}>Remind Me Later</button>
+          <button className="paycheck-defer-btn" onClick={handleDefer}>
+            ❌ Not Paid Yet — Ask Me Tomorrow
+          </button>
         </div>
       </div>
     </div>

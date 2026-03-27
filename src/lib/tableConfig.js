@@ -422,6 +422,40 @@ export const TABLE_CONFIG = {
     sync: (_, next) => syncStateItem('jessica_paycheck_entries', next),
     realtimeTable: 'app_state',
   },
+  // Deferred paychecks — "ask me tomorrow" feature
+  budget_deferred_paychecks: {
+    type: 'state', stateKey: 'deferred_paychecks',
+    load: (key, def) => loadStateItem('deferred_paychecks', key, def),
+    sync: (_, next) => syncStateItem('deferred_paychecks', next),
+    realtimeTable: 'app_state',
+  },
+  // Debt payment history — for autonomous balance tracking
+  budget_debt_payments: {
+    type: 'array', table: 'debt_payments',
+    fromRow: (r) => ({
+      id:               r.id,
+      debtId:           r.debt_id,
+      paymentDate:      r.payment_date,
+      amount:           num(r.amount),
+      principal:        r.principal        != null ? Number(r.principal)         : null,
+      interest:         r.interest         != null ? Number(r.interest)          : null,
+      remainingBalance: r.remaining_balance != null ? Number(r.remaining_balance) : null,
+      source:           r.source           || 'budget_plan',
+      createdAt:        r.created_at,
+    }),
+    toRow: (item) => ({
+      id:               item.id,
+      debt_id:          item.debtId,
+      payment_date:     item.paymentDate,
+      amount:           item.amount,
+      principal:        item.principal        || null,
+      interest:         item.interest         || null,
+      remaining_balance:item.remainingBalance || null,
+      source:           item.source           || 'budget_plan',
+    }),
+    load: (key, def) => loadArray(TABLE_CONFIG.budget_debt_payments, key, def),
+    sync: (prev, next) => syncArray(TABLE_CONFIG.budget_debt_payments, prev, next),
+  },
 };
 
 async function loadStateItem(stateKey, storageKey, defaultValue) {

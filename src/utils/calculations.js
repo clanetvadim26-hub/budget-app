@@ -62,3 +62,38 @@ export const getIncomeBySource = (incomes) => {
   const other = incomes.filter((i) => i.source === 'Other').reduce((s, i) => s + Number(i.amount), 0);
   return { vadim, jessica, other };
 };
+
+/**
+ * Generates monthly cash flow data from a given startDate to the current month.
+ * @param {Array}  incomes   - all income entries
+ * @param {Array}  expenses  - all expense entries
+ * @param {string} startDate - ISO date string like '2026-03-01'
+ * @returns {Array} array of { month, income, expenses, net } objects
+ */
+export function getCashFlowDataFromDate(incomes, expenses, startDate) {
+  const start = new Date(startDate);
+  const now   = new Date();
+  const months = [];
+
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor <= now) {
+    months.push(new Date(cursor));
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+
+  return months.map((monthDate) => {
+    const year     = monthDate.getFullYear();
+    const month    = monthDate.getMonth();
+    const monthStr = monthDate.toLocaleString('default', { month: 'short', year: '2-digit' });
+
+    const monthIncome = (incomes || [])
+      .filter((i) => { const d = new Date(i.date); return d.getFullYear() === year && d.getMonth() === month; })
+      .reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
+    const monthExpenses = (expenses || [])
+      .filter((e) => { const d = new Date(e.date); return d.getFullYear() === year && d.getMonth() === month; })
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    return { month: monthStr, income: monthIncome, expenses: monthExpenses, net: monthIncome - monthExpenses };
+  });
+}

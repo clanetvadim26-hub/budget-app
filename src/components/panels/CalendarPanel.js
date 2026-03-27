@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useConfirm } from '../ConfirmModal';
 import {
   format, addDays, addWeeks, addMonths, addYears,
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
@@ -63,7 +64,7 @@ function DayCell({ day, events = [], isCurrentMonth = true, onClick, compact = f
 }
 
 // ── Day Modal ──────────────────────────────────────────────────────────────
-function DayModal({ day, events, onClose, onMarkCCPaid, paidCCPayments }) {
+function DayModal({ day, events, onClose, onMarkCCPaid, paidCCPayments, onDeleteExpense, onDeleteIncome, confirm }) {
   const income  = events.filter((e) => e.isIncome).reduce((s, e) => s + e.amount, 0);
   const expAmt  = events.filter((e) => e.isExpense).reduce((s, e) => s + e.amount, 0);
   const net     = income - expAmt;
@@ -114,6 +115,18 @@ function DayModal({ day, events, onClose, onMarkCCPaid, paidCCPayments }) {
                   </span>
                   {e.type === 'credit-payment' && e.status !== 'paid' && (
                     <button className="btn-mark-paid-sm" onClick={() => onMarkCCPaid(e.id)}>✓ Paid</button>
+                  )}
+                  {e.type === 'expense' && onDeleteExpense && (
+                    <button className="cal-event-delete" title="Delete" onClick={async () => {
+                      const ok = await confirm?.(e.label || 'this expense');
+                      if (ok) onDeleteExpense(e.id);
+                    }}>🗑️</button>
+                  )}
+                  {e.type === 'income' && onDeleteIncome && (
+                    <button className="cal-event-delete" title="Delete" onClick={async () => {
+                      const ok = await confirm?.(e.label || 'this income');
+                      if (ok) onDeleteIncome(e.id);
+                    }}>🗑️</button>
                   )}
                 </div>
               ))}
@@ -325,8 +338,9 @@ export default function CalendarPanel() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const [expenses]          = useLocalStorage('budget_expenses',             []);
-  const [incomes]           = useLocalStorage('budget_incomes',              []);
+  const [expenses, setExpenses] = useLocalStorage('budget_expenses', []);
+  const [incomes,  setIncomes]  = useLocalStorage('budget_incomes',  []);
+  const confirm = useConfirm();
   const [recurringIncomes]  = useLocalStorage('budget_recurring_incomes',    []);
   const [recurringExpenses] = useLocalStorage('budget_recurring_expenses',   []);
   const [confirmedPaychecks]= useLocalStorage('budget_confirmed_paychecks',  {});
@@ -455,6 +469,9 @@ export default function CalendarPanel() {
           onClose={() => setSelectedDay(null)}
           onMarkCCPaid={markCCPaid}
           paidCCPayments={paidCCPayments}
+          onDeleteExpense={(id) => setExpenses((prev) => prev.filter((e) => e.id !== id))}
+          onDeleteIncome={(id)  => setIncomes((prev)  => prev.filter((i) => i.id !== id))}
+          confirm={confirm}
         />
       )}
     </div>

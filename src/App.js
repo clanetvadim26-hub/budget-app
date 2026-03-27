@@ -7,7 +7,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useConnectionStatus } from './hooks/useConnectionStatus';
 import {
   filterByMonth, filterByWeek, getTotalIncome, getTotalExpenses,
-  getSavingsRate, getExpensesByCategory, getLast6MonthsData,
+  getSavingsRate, getExpensesByCategory,
 } from './utils/calculations';
 import { getPendingPaychecks, getUpcomingThisMonth } from './utils/recurringDates';
 import { DEFAULT_ACCOUNTS } from './data/accounts';
@@ -17,18 +17,19 @@ import NavBar from './components/NavBar';
 import OverviewPanel from './components/panels/OverviewPanel';
 import ExpenseBreakdownPanel from './components/panels/ExpenseBreakdownPanel';
 import CashFlowPanel from './components/panels/CashFlowPanel';
-import SavingsTracker from './components/panels/SavingsTracker';
+import CalculatorsPanel from './components/panels/CalculatorsPanel';
 import AddExpenseForm from './components/forms/AddExpenseForm';
 import AddIncomeForm from './components/forms/AddIncomeForm';
 import FinancialAdvicePanel from './components/panels/FinancialAdvicePanel';
-import RecurringPanel from './components/panels/RecurringPanel';
 import AccountsPanel from './components/panels/AccountsPanel';
 import InvestmentsPanel from './components/panels/InvestmentsPanel';
 import DebtPanel from './components/panels/DebtPanel';
 import CalendarPanel from './components/panels/CalendarPanel';
 import MoneyFlowPanel from './components/panels/MoneyFlowPanel';
-import BudgetPlanPanel from './components/panels/BudgetPlanPanel';
 import FullBudgetPlanPanel from './components/panels/FullBudgetPlanPanel';
+import OverviewBudgetSummary from './components/panels/OverviewBudgetSummary';
+import PaycheckPanel from './components/panels/PaycheckPanel';
+import SetupWizard from './components/SetupWizard';
 import PendingConfirmationCard from './components/PendingConfirmationCard';
 import UpcomingExpensesCard from './components/UpcomingExpensesCard';
 import HealthScoreGauge, { calculateHealthScore } from './components/HealthScoreGauge';
@@ -56,6 +57,8 @@ export default function App() {
 
   // Variable bill entries — shared between Vadim & Jessica via Supabase
   const [variableBillEntries, setVariableBillEntries] = useLocalStorage('budget_variable_bill_entries', {});
+  // Deferred paychecks — "not paid yet, ask me tomorrow"
+  const [deferredPaychecks] = useLocalStorage('budget_deferred_paychecks', {});
   // Jessica's paycheck amounts — keyed by `incomeId_YYYY-MM-DD`
   const [, setJessicaPaycheckEntries] = useLocalStorage('budget_jessica_paycheck_entries', {});
 
@@ -91,7 +94,6 @@ export default function App() {
   const net            = totalIncome - totalExpenses;
   const savingsRate    = getSavingsRate(totalIncome, totalExpenses);
   const expensesByCategory = getExpensesByCategory(filteredExpenses);
-  const cashFlowData   = getLast6MonthsData(incomes, expenses);
 
   const monthlyExpenses = getTotalExpenses(filterByMonth(expenses, now));
   const monthlyIncome   = getTotalIncome(filterByMonth(incomes, now));
@@ -136,12 +138,20 @@ export default function App() {
     [recurringExpenses, variableBillEntries, currentMonthKey]
   );
 
-  // Which modal is active (priority order, respecting session dismissals)
+  // Helper: check if a paycheck key is deferred until tomorrow or later
+  const isDeferredToday = (key) => {
+    const d = deferredPaychecks?.[key];
+    if (!d) return false;
+    const today = format(now, 'yyyy-MM-dd');
+    return d.deferUntil > today;
+  };
+
+  // Which modal is active (priority order, respecting session dismissals and deferrals)
   const activeModal = useMemo(() => {
-    if (pendingVadimPaycheck && !sessionDismissed.has(pendingVadimPaycheck.key)) {
+    if (pendingVadimPaycheck && !sessionDismissed.has(pendingVadimPaycheck.key) && !isDeferredToday(pendingVadimPaycheck.key)) {
       return { type: 'vadim', data: pendingVadimPaycheck };
     }
-    if (pendingJessicaPaycheck && !sessionDismissed.has(pendingJessicaPaycheck.key)) {
+    if (pendingJessicaPaycheck && !sessionDismissed.has(pendingJessicaPaycheck.key) && !isDeferredToday(pendingJessicaPaycheck.key)) {
       return { type: 'jessica', data: pendingJessicaPaycheck };
     }
     if (pendingVariableBills.length > 0) {
@@ -251,7 +261,7 @@ export default function App() {
               viewMode={viewMode}
               incomes={filteredIncomes}
             />
-            <BudgetPlanPanel />
+            <OverviewBudgetSummary onNavigateToBudgetPlan={() => setActiveView('budget-plan')} />
           </>
         );
       case 'expenses':
@@ -264,9 +274,9 @@ export default function App() {
           />
         );
       case 'cashflow':
-        return <CashFlowPanel chartData={cashFlowData} />;
-      case 'savings':
-        return <SavingsTracker monthlyExpenses={monthlyExpenses} />;
+        return <CashFlowPanel />;
+      case 'calculators':
+        return <CalculatorsPanel />;
       case 'accounts':
         return <AccountsPanel />;
       case 'investments':
@@ -277,10 +287,10 @@ export default function App() {
         return <CalendarPanel />;
       case 'budget-plan':
         return <FullBudgetPlanPanel />;
+      case 'paycheck':
+        return <PaycheckPanel />;
       case 'moneyflow':
         return <MoneyFlowPanel />;
-      case 'recurring':
-        return <RecurringPanel />;
       case 'add-expense':
         return (
           <div className="form-panel">
@@ -341,6 +351,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <SetupWizard />
       <NavBar
         activeView={activeView}
         setActiveView={setActiveView}
