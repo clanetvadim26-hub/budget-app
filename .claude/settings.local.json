@@ -7,7 +7,9 @@
       "Bash(grep -v \"^$\")",
       "Bash(npm install:*)",
       "Bash(npm list:*)",
-      "Bash(npx react-scripts:*)"
+      "Bash(npx react-scripts:*)",
+      "Bash(grep -l \"Cell\" /c/Users/clane/budget-app/src/components/calculators/*.js)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
