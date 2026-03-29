@@ -4,7 +4,7 @@ export const ROTH_IRA_LIMITS = {
   2023: { base: 6500,  catchUp: 7500 },
   2024: { base: 7000,  catchUp: 8000 },
   2025: { base: 7000,  catchUp: 8000 },
-  2026: { base: 7000,  catchUp: 8000 }, // Treat as $7,000 until IRS announces otherwise
+  2026: { base: 7500,  catchUp: 8500 },
 };
 
 export const ROTH_YEARS = [2023, 2024, 2025, 2026];
@@ -73,3 +73,7 @@ export function defaultRothYear() {
 export const PHASE_OUT_MFJ_2025 = { start: 236000, end: 246000 };
 // Single / Head of Household:
 export const PHASE_OUT_SINGLE_2025 = { start: 150000, end: 165000 };
+
+// ── Income phase-out ranges (2026) ──────────────────────────────────────────
+export const PHASE_OUT_MFJ_2026    = { start: 240000, end: 250000 };
+export const PHASE_OUT_SINGLE_2026 = { start: 155000, end: 170000 };

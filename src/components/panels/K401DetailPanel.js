@@ -2,8 +2,8 @@ import React from 'react';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { formatCurrency } from '../../utils/calculations';
 
-const IRS_LIMIT_UNDER_50 = 23500;
-const IRS_LIMIT_OVER_50  = 31000;
+const IRS_LIMIT_UNDER_50 = 24000;
+const IRS_LIMIT_OVER_50  = 31500;
 const VESTING_OPTIONS    = ['Immediate', '1-Year Cliff', '2-Year Graded', '3-Year Graded', '4-Year Graded', '5-Year Graded', '6-Year Graded'];
 const MATCH_TYPES        = ['Dollar for dollar up to %', 'Percentage of contribution', 'Custom'];
 

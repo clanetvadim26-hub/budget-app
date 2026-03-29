@@ -35,9 +35,10 @@ const fmt = (n) => '$' + Math.round(n).toLocaleString();
 const pct = (n) => n.toFixed(2) + '%';
 
 function getOrdinaryTax(income, status) {
+  // 2026 federal income tax brackets
   const brackets = {
-    Single: [[11600, 0.10], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [609350, 0.35], [Infinity, 0.37]],
-    MFJ:    [[23200, 0.10], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]],
+    Single: [[11925, 0.10], [48475, 0.12], [103350, 0.22], [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37]],
+    MFJ:    [[23850, 0.10], [96950, 0.12], [206700, 0.22], [394600, 0.24], [501050, 0.32], [751600, 0.35], [Infinity, 0.37]],
   };
   const b = brackets[status] || brackets.Single;
   let tax = 0, prev = 0;
@@ -50,8 +51,9 @@ function getOrdinaryTax(income, status) {
 }
 
 function getLTCGRate(income, status) {
-  if (status === 'Single') { return income <= 47025 ? 0 : income <= 518900 ? 0.15 : 0.20; }
-  return income <= 94050 ? 0 : income <= 583750 ? 0.15 : 0.20;
+  // 2026 long-term capital gains thresholds (estimated)
+  if (status === 'Single') { return income <= 49650 ? 0 : income <= 549250 ? 0.15 : 0.20; }
+  return income <= 99300 ? 0 : income <= 600050 ? 0.15 : 0.20;
 }
 
 const DEFAULTS = { purchasePrice: '', salePrice: '', holdPeriod: 'long', filingStatus: 'Single', annualIncome: '' };

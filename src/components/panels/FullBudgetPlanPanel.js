@@ -124,8 +124,37 @@ function SummaryBar({ income, fixed, variable, savings }) {
   );
 }
 
+// ── Account link dropdown ────────────────────────────────────────────────────
+function AccountLinkSelect({ value, onChange, accounts, style = {} }) {
+  const groups = [
+    { label: 'Checking & Savings', types: ['checking', 'savings', 'money_market', 'cd'] },
+    { label: 'Credit Cards', types: ['credit', 'store_credit'] },
+    { label: 'Loans', types: ['mortgage', 'auto_loan', 'personal_loan', 'student_loan'] },
+    { label: 'Retirement', types: ['roth_ira', 'traditional_ira', '401k', 'roth_401k', '403b', 'hsa'] },
+    { label: 'Investment', types: ['brokerage', 'reit', 'crypto'] },
+  ];
+  return (
+    <select
+      value={value || ''}
+      onChange={e => onChange(e.target.value || null)}
+      style={{ background: '#0A1020', border: '1px solid #1E293B', color: value ? '#F1F5F9' : '#64748B', borderRadius: 6, padding: '3px 6px', fontSize: 11, cursor: 'pointer', ...style }}
+    >
+      <option value="">🔗 link</option>
+      {groups.map(g => {
+        const accs = (accounts || []).filter(a => g.types.includes(a.type));
+        if (!accs.length) return null;
+        return (
+          <optgroup key={g.label} label={g.label}>
+            {accs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </optgroup>
+        );
+      })}
+    </select>
+  );
+}
+
 // Shared Add/Delete table for fixed expense rows
-function ExpenseTable({ expenses, onUpdate, onDelete, onAdd }) {
+function ExpenseTable({ expenses, onUpdate, onDelete, onAdd, accounts, onLink }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [amt, setAmt]   = useState('');
@@ -162,6 +191,7 @@ function ExpenseTable({ expenses, onUpdate, onDelete, onAdd }) {
               <InlineEdit value={exp.dueDay??0} onSave={v => onUpdate(exp.id,'dueDay',v)} formatFn={v=>v>0?`${v}th`:'—'} className="fbp-ie" min={0} step="1" />
             </span>
             <button className="fbp-delete-btn" onClick={() => onDelete(exp.id)} title="Delete">×</button>
+            {onLink && <AccountLinkSelect value={exp.metadata?.linkedAccountId} onChange={id => onLink(exp.id, id)} accounts={accounts} />}
           </div>
         );
       })}
@@ -189,7 +219,7 @@ function AddSavingsModal({ accounts, onAdd, onClose }) {
   const [startDate, setStartDate]   = useState('');
 
   const savingsAccounts = (accounts || []).filter(a =>
-    ['savings', 'roth_ira', 'brokerage', '401k', 'hsa'].includes(a.type)
+    ['savings', 'money_market', 'cd', 'roth_ira', 'traditional_ira', '401k', 'roth_401k', '403b', 'hsa', 'brokerage', 'reit', 'crypto'].includes(a.type)
   );
 
   const handleAccountChange = (id) => {
@@ -256,7 +286,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
   const [newBudgetAmt, setNewBudgetAmt]   = useState('');
 
   const paycheck      = settings['vadim_paycheck'] ?? 2200;
-  const monthlyIncome = Math.round((paycheck * 26) / 12 * 100) / 100;
+  const monthlyIncome = paycheck * 2;
 
   // Dynamic savings list from JSON or static fallback
   const savingsList = useMemo(
@@ -321,6 +351,9 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
       category: 'housing', frequency: 'monthly', dueDay,
       metadata: { tag: 'fixed', owner: 'vadim' },
     }]);
+  const linkExpense = (id, accountId) => {
+    setRecurringExpenses(prev => prev.map(e => e.id === id ? { ...e, metadata: { ...(e.metadata||{}), linkedAccountId: accountId } } : e));
+  };
 
   const totalFixed    = fixedExpenses.reduce((s, e) => s + (e.amount || 0), 0);
   const totalVariable = varBudgets.reduce((s, e) => s + (e.amount || 0), 0);
@@ -337,7 +370,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
             <InlineEdit value={paycheck} onSave={v => setSetting('vadim_paycheck', v)} formatFn={formatCurrencyFull} className="fbp-ie" />
           </div>
           <div className="fbp-table-row fbp-subdued">
-            <span>Monthly equivalent (×26/12)</span>
+            <span>Monthly (2 paychecks)</span>
             <span>{formatCurrencyFull(monthlyIncome)}</span>
           </div>
           <div className="fbp-table-row">
@@ -353,7 +386,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
       {/* ── Fixed Expenses ── */}
       <div className="fbp-section">
         <SectionHeader title="Fixed Expenses" icon="📋" total={totalFixed} totalColor="#F87171" />
-        <ExpenseTable expenses={fixedExpenses} onUpdate={updateExpense} onDelete={deleteExpense} onAdd={addExpense} />
+        <ExpenseTable expenses={fixedExpenses} onUpdate={updateExpense} onDelete={deleteExpense} onAdd={addExpense} accounts={accounts} onLink={linkExpense} />
       </div>
 
       {/* ── Variable Budgets ── */}
@@ -373,6 +406,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
                 </span>
                 <InlineEdit value={exp.amount} onSave={v => updateVarBudget(exp.id, v)} formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
                 <button className="fbp-delete-btn" onClick={() => deleteVarBudget(exp.id)} title="Delete">×</button>
+                <AccountLinkSelect value={exp.metadata?.linkedAccountId} onChange={id => linkExpense(exp.id, id)} accounts={accounts} />
               </div>
             );
           })}
@@ -408,7 +442,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
             return (
               <div key={key} className={`fbp-table-row fbp-savings-row ${isFuture ? 'fbp-future' : ''}`}>
                 <div className="fbp-savings-name">
-                  <span>{label}</span>
+                  <span>{label}{accountId ? ' 🔗' : ''}</span>
                   {isFuture && (
                     <span className="fbp-chip purple">Starts {format(parseISO(startDate), 'MMM yyyy')} · {daysTo}d</span>
                   )}
@@ -434,7 +468,7 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
 }
 
 // ── JESSICA VIEW ──────────────────────────────────────────────────────────────
-function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses }) {
+function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses, accounts }) {
   const [addingAlloc, setAddingAlloc] = useState(false);
   const [newAllocLabel, setNewAllocLabel] = useState('');
   const [newAllocPct, setNewAllocPct]     = useState('');
@@ -469,9 +503,11 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
   const allocTotal   = Object.values(allocValues).reduce((s, v) => s + (v || 0), 0);
   const allocWarning = allocTotal !== 100;
 
+  const spendableIncome = estMonthly * (1 - Number(settings['jessica_1099_tax_rate'] || 25) / 100);
+
   const amounts = {};
   for (const a of allocList) {
-    amounts[a.key] = Math.round(estMonthly * (allocValues[a.key] || 0) / 100 * 100) / 100;
+    amounts[a.key] = Math.round(spendableIncome * (allocValues[a.key] || 0) / 100 * 100) / 100;
   }
 
   // Jessica's fixed expenses
@@ -488,10 +524,17 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
       category: 'loan_payments', frequency: 'monthly', dueDay,
       metadata: { tag: 'fixed', owner: 'jessica' },
     }]);
+  const linkExpense = (id, accountId) => {
+    setRecurringExpenses(prev => prev.map(e => e.id === id ? { ...e, metadata: { ...(e.metadata||{}), linkedAccountId: accountId } } : e));
+  };
 
   const totalFixed   = jessicaFixed.reduce((s, e) => s + (e.amount || 0), 0);
   const totalSavings = allocList.filter(a => a.key.includes('savings') || a.key.includes('roth'))
     .reduce((s, a) => s + (amounts[a.key] || 0), 0);
+
+  const taxRate       = Number(settings['jessica_1099_tax_rate'] || 25);
+  const taxReserve    = Math.round(estMonthly * taxRate / 100 * 100) / 100;
+  const ytdSetAside   = Number(settings['jessica_1099_ytd_setaside'] || 0);
 
   return (
     <div className="fbp-view">
@@ -514,6 +557,35 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
             <span className="fbp-payday">
               <InlineEdit value={settings['jessica_next_ot_payday']||'2026-03-27'} onSave={v=>setSetting('jessica_next_ot_payday',v)} type="text" formatFn={formatPayday} className="fbp-ie" />
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 1099 Tax Reserve ── */}
+      <div className="fbp-section">
+        <SectionHeader title="1099 Tax Reserve" icon="📋" total={taxReserve} totalColor="#F87171" />
+        <div className="fbp-table">
+          <div className="fbp-table-row fbp-subdued" style={{fontSize:12,color:'#64748B',padding:'6px 14px'}}>
+            <span>Competitive Edge is 1099 income — set aside each month for taxes</span>
+          </div>
+          <div className="fbp-table-row">
+            <span className="fbp-row-label">Set-aside rate</span>
+            <InlineEdit value={taxRate} onSave={v=>setSetting('jessica_1099_tax_rate',v)} formatFn={v=>`${v}%`} className="fbp-ie" step="1" />
+          </div>
+          <div className="fbp-table-row fbp-subdued">
+            <span>Monthly set-aside ({taxRate}%)</span>
+            <span style={{color:'#F87171'}}>{formatCurrencyFull(taxReserve)}</span>
+          </div>
+          <div className="fbp-table-row fbp-subdued">
+            <span>Spendable after set-aside</span>
+            <span style={{color:'#4ADE80'}}>{formatCurrencyFull(spendableIncome)}</span>
+          </div>
+          <div className="fbp-table-row fbp-subdued">
+            <span>YTD set aside</span>
+            <InlineEdit value={ytdSetAside} onSave={v=>setSetting('jessica_1099_ytd_setaside',v)} formatFn={formatCurrencyFull} className="fbp-ie" />
+          </div>
+          <div className="fbp-table-row fbp-subdued" style={{fontSize:11,color:'#475569',padding:'4px 14px'}}>
+            <span>Quarterly estimated payments: Apr 15 · Jun 15 · Sep 15 · Jan 15 · Tax year: 2026 (due Apr 15, 2027)</span>
           </div>
         </div>
       </div>
@@ -557,7 +629,7 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
       {/* ── Fixed Expenses ── */}
       <div className="fbp-section">
         <SectionHeader title="Fixed Expenses" icon="📋" total={totalFixed} totalColor="#F87171" />
-        <ExpenseTable expenses={jessicaFixed} onUpdate={updateExpense} onDelete={deleteExpense} onAdd={addExpense} />
+        <ExpenseTable expenses={jessicaFixed} onUpdate={updateExpense} onDelete={deleteExpense} onAdd={addExpense} accounts={accounts} onLink={linkExpense} />
       </div>
 
       <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalSavings} />
@@ -568,7 +640,7 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
 // ── HOUSEHOLD VIEW ────────────────────────────────────────────────────────────
 function HouseholdView({ settings, accounts, recurringExpenses }) {
   const vadimPaycheck   = settings['vadim_paycheck']            ?? 2200;
-  const vadimMonthly    = Math.round((vadimPaycheck * 26) / 12 * 100) / 100;
+  const vadimMonthly    = vadimPaycheck * 2;
   const jessicaMonthly  = settings['jessica_estimated_monthly'] ?? 2000;
   const totalMonthly    = vadimMonthly + jessicaMonthly;
 
@@ -701,7 +773,7 @@ export default function FullBudgetPlanPanel() {
           recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses} />
       )}
       {activeTab === 'jessica' && (
-        <JessicaView settings={settings||{}} setSetting={setSetting}
+        <JessicaView settings={settings||{}} setSetting={setSetting} accounts={accounts}
           recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses} />
       )}
       {activeTab === 'household' && (

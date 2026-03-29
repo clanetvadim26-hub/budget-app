@@ -29,7 +29,7 @@ export default function HSACalc() {
   const [coverageType, setCoverageType] = useState('single');
   const [result, setResult] = useState(null);
 
-  const LIMITS = { single: 4150, family: 8300 };
+  const LIMITS = { single: 4300, family: 8550 }; // 2026 IRS limits
 
   const calculate = () => {
     const balance0 = parseFloat(currentBalance) || 0;

@@ -7,11 +7,34 @@ import { format } from 'date-fns';
 
 /**
  * Get the monthly contribution amount for an account from budget_settings.
- * Keys follow the pattern: `contrib_<accountId>`
+ * Reads the dynamic vadim_savings_list first, then falls back to static key map.
  */
 export function getContributionForAccount(settings, accountId) {
   if (!settings) return 0;
-  return Number(settings[`contrib_${accountId}`] || 0);
+
+  // Dynamic lookup via vadim_savings_list
+  if (settings['vadim_savings_list']) {
+    try {
+      const list = JSON.parse(settings['vadim_savings_list']);
+      if (Array.isArray(list)) {
+        const entry = list.find(s => s.accountId === accountId);
+        if (entry && entry.key && settings[entry.key] !== undefined) {
+          return Number(settings[entry.key]) || 0;
+        }
+      }
+    } catch {}
+  }
+
+  // Static fallback key map
+  const keyMap = {
+    'cap1_joint_savings':       'vadim_savings_cap1_monthly',
+    'roth_ira_vadim':           'vadim_savings_roth_monthly',
+    'brokerage_joint':          'vadim_savings_brokerage_monthly',
+    'ameriprise_savings_vadim': 'vadim_savings_ameriprise_monthly',
+    '401k_vadim':               'vadim_savings_401k_monthly',
+  };
+  const key = keyMap[accountId];
+  return key ? (Number(settings[key]) || 0) : 0;
 }
 
 /**

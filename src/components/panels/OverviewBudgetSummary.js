@@ -39,7 +39,7 @@ export default function OverviewBudgetSummary({ onNavigateToBudgetPlan }) {
   // ── Vadim ────────────────────────────────────────────────────────────
   const vadimIncome = useMemo(() => {
     const paycheck = Number(settings['vadim_paycheck'] || 0);
-    return Math.round((paycheck * 26) / 12 * 100) / 100;
+    return paycheck * 2;
   }, [settings]);
 
   const vadimFixedTotal = useMemo(() => {

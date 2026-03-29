@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useConfirm } from './components/ConfirmModal';
 import './App.css';
 import './styles/new-features.css';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useConnectionStatus } from './hooks/useConnectionStatus';
 import {
@@ -39,6 +39,7 @@ import PaycheckAllocationModal from './components/PaycheckAllocationModal';
 import JessicaPaycheckModal from './components/JessicaPaycheckModal';
 import VariableBillModal from './components/VariableBillModal';
 import FinancialAlerts from './components/FinancialAlerts';
+import ContributionConfirmationModal from './components/ContributionConfirmationModal';
 
 export default function App() {
   const [activeView, setActiveView] = useState('overview');
@@ -71,11 +72,19 @@ export default function App() {
     general:     { current: 0, target: 0 },
   });
 
+  // Contribution confirmation persistence
+  const [confirmedContributions, setConfirmedContributions] = useLocalStorage('budget_confirmed_contributions', {});
+  const [deferredContributions, setDeferredContributions] = useLocalStorage('budget_deferred_contributions', {});
+  const [settings] = useLocalStorage('budget_settings', {});
+
   // Session-dismissed modals (not persisted — resets on page reload)
   const [sessionDismissed, setSessionDismissed] = useState(new Set());
   const dismissModal = (key) => setSessionDismissed((prev) => new Set([...prev, key]));
 
-  const now = new Date();
+  const [activeContribIndex, setActiveContribIndex] = useState(0);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => new Date(), []);
 
   const filteredExpenses = useMemo(
     () => (viewMode === 'monthly' ? filterByMonth(expenses, now) : filterByWeek(expenses, now)),
@@ -108,6 +117,61 @@ export default function App() {
     () => getUpcomingThisMonth(recurringExpenses, paidExpenseKeys),
     [recurringExpenses, paidExpenseKeys]
   );
+
+  // Pending contribution/payment confirmations
+  const pendingContributions = useMemo(() => {
+    const today = format(now, 'yyyy-MM-dd');
+    const pending = [];
+
+    // Get Vadim's savings list from budget_settings
+    let savingsList = null;
+    if (settings && settings['vadim_savings_list']) {
+      try { savingsList = JSON.parse(settings['vadim_savings_list']); } catch {}
+    }
+    if (!savingsList) savingsList = [
+      { key: 'vadim_savings_cap1_monthly', accountId: 'cap1_joint_savings', label: 'Capital One Joint Savings' },
+      { key: 'vadim_savings_roth_monthly', accountId: 'roth_ira_vadim', label: 'Vadim Roth IRA' },
+      { key: 'vadim_savings_brokerage_monthly', accountId: 'brokerage_joint', label: 'Ameriprise Joint Brokerage' },
+    ];
+
+    // Check each savings entry
+    if (settings) {
+      savingsList.forEach(sv => {
+        const amount = Number(settings[sv.key] || 0);
+        if (!amount || !sv.accountId) return;
+
+        // Use next payday as the trigger date
+        const paydayStr = settings['vadim_next_payday'];
+        if (!paydayStr) return;
+
+        // Check if payday has passed
+        if (paydayStr > today) return;
+
+        const itemId = `contrib_${sv.accountId}_${paydayStr}`;
+        if (confirmedContributions[itemId]) return;
+
+        // Check deferral
+        const deferred = deferredContributions[itemId];
+        if (deferred && deferred.deferUntil > today) return;
+
+        const account = accounts.find(a => a.id === sv.accountId);
+        const accountType = account?.type || 'savings';
+        pending.push({
+          id: itemId,
+          accountId: sv.accountId,
+          accountName: sv.label || account?.name || sv.accountId,
+          accountType,
+          amount,
+          dueDate: paydayStr,
+          label: sv.label || account?.name || sv.accountId,
+          isDebt: false,
+        });
+      });
+    }
+
+    return pending;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, confirmedContributions, deferredContributions, accounts, now]);
 
   // Health score
   const { score: healthScore, breakdown: healthBreakdown } = useMemo(
@@ -161,6 +225,7 @@ export default function App() {
       }
     }
     return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingVadimPaycheck, pendingJessicaPaycheck, pendingVariableBills, sessionDismissed, currentMonthKey]);
 
   // Paychecks to show in the standard PendingConfirmationCard (non-modal ones)
@@ -396,6 +461,28 @@ export default function App() {
           variableBillEntries={variableBillEntries}
           onSave={handleVariableBillSave}
           onClose={() => dismissModal(`vbill_${activeModal.data.id}_${currentMonthKey}`)}
+        />
+      )}
+
+      {/* Contribution / debt-payment confirmations (shown after paycheck modals) */}
+      {!activeModal && pendingContributions.length > 0 && activeContribIndex < pendingContributions.length &&
+        !sessionDismissed.has(`contrib_dismiss_${pendingContributions[activeContribIndex]?.id}`) && (
+        <ContributionConfirmationModal
+          item={pendingContributions[activeContribIndex]}
+          onConfirm={(id) => {
+            const today = format(now, 'yyyy-MM-dd');
+            setConfirmedContributions(prev => ({ ...prev, [id]: { confirmedDate: today } }));
+            setActiveContribIndex(i => i + 1);
+          }}
+          onDefer={(id) => {
+            const tomorrow = format(addDays(now, 1), 'yyyy-MM-dd');
+            setDeferredContributions(prev => ({ ...prev, [id]: { deferUntil: tomorrow } }));
+            setActiveContribIndex(i => i + 1);
+          }}
+          onDismiss={(id) => {
+            dismissModal(`contrib_dismiss_${id}`);
+            setActiveContribIndex(i => i + 1);
+          }}
         />
       )}
     </div>

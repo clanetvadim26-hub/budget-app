@@ -37,12 +37,12 @@ const resultCard = (highlight) => ({
 const fmt = (n) => '$' + Math.round(n).toLocaleString();
 const pct = (n) => (typeof n === 'number' ? n.toFixed(1) : '0.0') + '%';
 
-const STANDARD_DEDUCTIONS = { Single: 14600, MFJ: 29200, HOH: 21900 };
+const STANDARD_DEDUCTIONS = { Single: 15000, MFJ: 30000, HOH: 22500 };
 
 const BRACKETS = {
-  Single: [[11600, 0.10], [47150, 0.12], [100525, 0.22], [191950, 0.24], [243725, 0.32], [609350, 0.35], [Infinity, 0.37]],
-  MFJ:    [[23200, 0.10], [94300, 0.12], [201050, 0.22], [383900, 0.24], [487450, 0.32], [731200, 0.35], [Infinity, 0.37]],
-  HOH:    [[16550, 0.10], [63100, 0.12], [100500, 0.22], [191950, 0.24], [243700, 0.32], [609350, 0.35], [Infinity, 0.37]],
+  Single: [[11925, 0.10], [48475, 0.12], [103350, 0.22], [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37]],
+  MFJ:    [[23850, 0.10], [96950, 0.12], [206700, 0.22], [394600, 0.24], [501050, 0.32], [751600, 0.35], [Infinity, 0.37]],
+  HOH:    [[17000, 0.10], [64850, 0.12], [103350, 0.22], [197300, 0.24], [250500, 0.32], [626350, 0.35], [Infinity, 0.37]],
 };
 
 function calcTax(taxableIncome, status) {
@@ -114,7 +114,7 @@ export default function TaxRateCalc() {
   return (
     <div style={S.wrap}>
       <div style={S.title}>Tax Rate Calculator</div>
-      <div style={S.sub}>Estimate your 2024 federal income tax, marginal rate, and effective rate</div>
+      <div style={S.sub}>Estimate your 2026 federal income tax, marginal rate, and effective rate</div>
 
       <div style={S.grid}>
         <div style={S.card}>
