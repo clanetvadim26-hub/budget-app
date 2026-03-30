@@ -10,6 +10,7 @@ import {
   getSavingsRate, getExpensesByCategory,
 } from './utils/calculations';
 import { getPendingPaychecks, getUpcomingThisMonth } from './utils/recurringDates';
+import { applyPaymentToDebt, applyContributionToAccount } from './utils/budgetPlanSync';
 import { DEFAULT_ACCOUNTS } from './data/accounts';
 import { DEFAULT_RECURRING_EXPENSES, DEFAULT_RECURRING_INCOMES } from './data/defaultRecurring';
 
@@ -40,10 +41,12 @@ import JessicaPaycheckModal from './components/JessicaPaycheckModal';
 import VariableBillModal from './components/VariableBillModal';
 import FinancialAlerts from './components/FinancialAlerts';
 import ContributionConfirmationModal from './components/ContributionConfirmationModal';
+import PersonSelector from './components/PersonSelector';
 
 export default function App() {
   const [activeView, setActiveView] = useState('overview');
   const [viewMode, setViewMode] = useState('monthly');
+  const [activePerson, setActivePerson] = useState(null);
   const connectionStatus = useConnectionStatus();
 
   // Core budget data
@@ -64,7 +67,7 @@ export default function App() {
   const [, setJessicaPaycheckEntries] = useLocalStorage('budget_jessica_paycheck_entries', {});
 
   // Accounts & savings for health score
-  const [accounts] = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
+  const [accounts, setAccounts] = useLocalStorage('budget_accounts', DEFAULT_ACCOUNTS);
   const [savings] = useLocalStorage('budget_savings', {
     emergency: { current: 0, target: 0 },
     roth_ira:    { current: 0, target: 7000 },
@@ -351,7 +354,7 @@ export default function App() {
       case 'calendar':
         return <CalendarPanel />;
       case 'budget-plan':
-        return <FullBudgetPlanPanel />;
+        return <FullBudgetPlanPanel defaultTab={activePerson === 'jessica' ? 'jessica' : activePerson === 'both' ? 'household' : 'vadim'} />;
       case 'paycheck':
         return <PaycheckPanel />;
       case 'moneyflow':
@@ -414,6 +417,10 @@ export default function App() {
     }
   };
 
+  if (activePerson === null) {
+    return <PersonSelector onSelect={setActivePerson} />;
+  }
+
   return (
     <div className="app">
       <SetupWizard />
@@ -469,9 +476,16 @@ export default function App() {
         !sessionDismissed.has(`contrib_dismiss_${pendingContributions[activeContribIndex]?.id}`) && (
         <ContributionConfirmationModal
           item={pendingContributions[activeContribIndex]}
-          onConfirm={(id) => {
+          onConfirm={(item) => {
             const today = format(now, 'yyyy-MM-dd');
-            setConfirmedContributions(prev => ({ ...prev, [id]: { confirmedDate: today } }));
+            if (item.isDebt) {
+              const { accounts: updated } = applyPaymentToDebt(accounts, item.accountId, item.amount, today);
+              setAccounts(updated);
+            } else {
+              const updated = applyContributionToAccount(accounts, item.accountId, item.amount, today);
+              setAccounts(updated);
+            }
+            setConfirmedContributions(prev => ({ ...prev, [item.id]: { confirmedDate: today } }));
             setActiveContribIndex(i => i + 1);
           }}
           onDefer={(id) => {

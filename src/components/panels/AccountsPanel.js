@@ -4,6 +4,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/accounts';
 import { formatCurrency } from '../../utils/calculations';
 import { monthlyInterest } from '../../utils/debtCalculations';
+import { getContributionForAccount } from '../../utils/budgetPlanSync';
 import NetWorthChart from '../charts/NetWorthChart';
 import { useConfirm } from '../ConfirmModal';
 
@@ -74,7 +75,7 @@ function UtilizationBar({ balance, creditLimit }) {
 function AccountCard({ account, settings = {}, onSave, onDelete }) {
   const isCC = account.type === 'credit';
   const isInvestment = ACCOUNT_TYPE_META[account.type]?.isInvestment || false;
-  const planContrib = isInvestment ? Number(settings[`contrib_${account.id}`] || 0) : null;
+  const planContrib = isInvestment ? getContributionForAccount(settings, account.id) : null;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     balance:            account.balance            || 0,
@@ -494,13 +495,16 @@ export default function AccountsPanel() {
   const [netWorthHistory, setNetWorthHistory] = useLocalStorage('budget_networth_history', []);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // Migrate: add any missing default accounts (e.g. 3 new Capital One CCs)
+  // Migrate: add any missing default accounts — runs ONCE per device
   useEffect(() => {
+    const migrated = localStorage.getItem('budget_accounts_migrated');
+    if (migrated) return;
     const existingIds = new Set(accounts.map((a) => a.id));
     const missing = DEFAULT_ACCOUNTS.filter((a) => !existingIds.has(a.id));
     if (missing.length > 0) {
       setAccounts((prev) => [...prev, ...missing]);
     }
+    localStorage.setItem('budget_accounts_migrated', 'true');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

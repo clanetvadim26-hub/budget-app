@@ -17,6 +17,11 @@ const VADIM_SAVINGS_DEFAULT = [
   { key: 'vadim_savings_401k_monthly',          accountId: '401k_vadim',               label: 'Vadim 401k (starts June 2026)',               targetGoal: 0, startDate: '2026-06-01' },
 ];
 
+const JESSICA_SAVINGS_DEFAULT = [
+  { key: 'jessica_savings_roth_monthly',    accountId: 'roth_ira_jessica',   label: 'Jessica Roth IRA 2025',          targetGoal: 7000, deadline: '2026-04-15' },
+  { key: 'jessica_savings_cap1_monthly',    accountId: 'cap1_joint_savings', label: 'Capital One Joint Savings',      targetGoal: 0 },
+];
+
 const JESSICA_ALLOCS_DEFAULT = [
   { key: 'jessica_alloc_household', label: '🏠 Household contribution',   color: '#60A5FA' },
   { key: 'jessica_alloc_savings',   label: '💰 Capital One Joint Savings', color: '#4ADE80' },
@@ -211,7 +216,7 @@ function ExpenseTable({ expenses, onUpdate, onDelete, onAdd, accounts, onLink })
 }
 
 // Modal for adding a savings goal
-function AddSavingsModal({ accounts, onAdd, onClose }) {
+function AddSavingsModal({ accounts, onAdd, onClose, keyPrefix = 'vadim_savings' }) {
   const [accountId, setAccountId] = useState('');
   const [label, setLabel]         = useState('');
   const [monthly, setMonthly]     = useState('');
@@ -232,7 +237,7 @@ function AddSavingsModal({ accounts, onAdd, onClose }) {
     const lbl = label.trim() || (savingsAccounts.find(a=>a.id===accountId)?.name) || 'Savings';
     const id = accountId || `custom_${Date.now()}`;
     onAdd({
-      key:        `vadim_savings_${id}_monthly`,
+      key:        `${keyPrefix}_${id}_monthly`,
       accountId:  accountId || null,
       label:      lbl,
       targetGoal: Number(targetGoal) || 0,
@@ -468,10 +473,11 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
 }
 
 // ── JESSICA VIEW ──────────────────────────────────────────────────────────────
-function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses, accounts }) {
+function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses, accounts, setAccounts }) {
   const [addingAlloc, setAddingAlloc] = useState(false);
   const [newAllocLabel, setNewAllocLabel] = useState('');
   const [newAllocPct, setNewAllocPct]     = useState('');
+  const [showAddSavings, setShowAddSavings] = useState(false);
 
   const estMonthly = settings['jessica_estimated_monthly'] ?? 2000;
 
@@ -528,13 +534,37 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
     setRecurringExpenses(prev => prev.map(e => e.id === id ? { ...e, metadata: { ...(e.metadata||{}), linkedAccountId: accountId } } : e));
   };
 
-  const totalFixed   = jessicaFixed.reduce((s, e) => s + (e.amount || 0), 0);
-  const totalSavings = allocList.filter(a => a.key.includes('savings') || a.key.includes('roth'))
-    .reduce((s, a) => s + (amounts[a.key] || 0), 0);
+  const totalFixed = jessicaFixed.reduce((s, e) => s + (e.amount || 0), 0);
 
   const taxRate       = Number(settings['jessica_1099_tax_rate'] || 25);
   const taxReserve    = Math.round(estMonthly * taxRate / 100 * 100) / 100;
   const ytdSetAside   = Number(settings['jessica_1099_ytd_setaside'] || 0);
+
+  // Jessica savings list (mirrors Vadim's savings section)
+  const jessicaSavingsList = useMemo(
+    () => parseJson(settings['jessica_savings_list'], null) || JESSICA_SAVINGS_DEFAULT,
+    [settings]
+  );
+
+  const addJessicaSavingsEntry = (entry) => {
+    const newList = [...jessicaSavingsList, { key: entry.key, accountId: entry.accountId, label: entry.label, targetGoal: entry.targetGoal, startDate: entry.startDate }];
+    setSetting('jessica_savings_list', JSON.stringify(newList));
+    if (entry._initMonthly > 0) setSetting(entry.key, entry._initMonthly);
+  };
+
+  const deleteJessicaSavingsEntry = (key) => {
+    const newList = jessicaSavingsList.filter(sv => sv.key !== key);
+    setSetting('jessica_savings_list', JSON.stringify(newList));
+  };
+
+  const updateJessicaSavings = (settingKey, accountId, value) => {
+    setSetting(settingKey, value);
+    if (accountId && setAccounts) {
+      setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, monthlyContribution: value } : a));
+    }
+  };
+
+  const totalJessicaSavings = jessicaSavingsList.reduce((s, sv) => s + (Number(settings[sv.key]) || 0), 0);
 
   return (
     <div className="fbp-view">
@@ -632,7 +662,39 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
         <ExpenseTable expenses={jessicaFixed} onUpdate={updateExpense} onDelete={deleteExpense} onAdd={addExpense} accounts={accounts} onLink={linkExpense} />
       </div>
 
-      <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalSavings} />
+      {/* ── Savings & Investments ── */}
+      <div className="fbp-section">
+        <SectionHeader title="Savings & Investments" icon="📈" total={totalJessicaSavings} totalColor="#4ADE80" />
+        <div className="fbp-table fbp-savings-table">
+          <div className="fbp-table-head fbp-savings-head">
+            <span>Account</span><span>Monthly</span><span>Linked</span><span />
+          </div>
+          {jessicaSavingsList.map(({ key, accountId, label, targetGoal, startDate }) => {
+            const monthly  = settings[key] ?? 0;
+            const acct     = (accounts || []).find(a => a.id === accountId);
+            const isFuture = startDate && new Date(startDate) > new Date();
+            const projected = acct && targetGoal > 0 ? projectedDateLabel(acct.balance || 0, targetGoal, monthly) : null;
+            return (
+              <div key={key} className={`fbp-table-row fbp-savings-row ${isFuture ? 'fbp-future' : ''}`}>
+                <div className="fbp-savings-name">
+                  <span>{label}{accountId ? ' 🔗' : ''}</span>
+                  {projected && <span className="fbp-projected">{projected}</span>}
+                </div>
+                <InlineEdit value={monthly} onSave={v => updateJessicaSavings(key, accountId, v)} formatFn={formatCurrencyFull} className="fbp-ie" suffix="/mo" />
+                <span className="fbp-subdued">{acct?.name || (accountId || '—')}</span>
+                <button className="fbp-delete-btn" onClick={() => deleteJessicaSavingsEntry(key)} title="Remove">×</button>
+              </div>
+            );
+          })}
+          <button className="fbp-add-btn" onClick={() => setShowAddSavings(true)}>＋ Add savings goal</button>
+        </div>
+      </div>
+
+      <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalJessicaSavings} />
+
+      {showAddSavings && (
+        <AddSavingsModal accounts={accounts} onAdd={addJessicaSavingsEntry} onClose={() => setShowAddSavings(false)} keyPrefix="jessica_savings" />
+      )}
     </div>
   );
 }
@@ -747,11 +809,11 @@ function HouseholdView({ settings, accounts, recurringExpenses }) {
 }
 
 // ── MAIN PANEL ────────────────────────────────────────────────────────────────
-export default function FullBudgetPlanPanel() {
+export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
   const [settings, setSettings] = useLocalStorage('budget_settings', DEFAULT_BUDGET_SETTINGS);
   const [accounts, setAccounts] = useLocalStorage('budget_accounts',  DEFAULT_ACCOUNTS);
   const [recurringExpenses, setRecurringExpenses] = useLocalStorage('budget_recurring_expenses', DEFAULT_RECURRING_EXPENSES);
-  const [activeTab, setActiveTab] = useState('vadim');
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   const setSetting = (key, value) => setSettings(prev => ({ ...(prev||{}), [key]: value }));
 
@@ -773,7 +835,7 @@ export default function FullBudgetPlanPanel() {
           recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses} />
       )}
       {activeTab === 'jessica' && (
-        <JessicaView settings={settings||{}} setSetting={setSetting} accounts={accounts}
+        <JessicaView settings={settings||{}} setSetting={setSetting} accounts={accounts} setAccounts={setAccounts}
           recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses} />
       )}
       {activeTab === 'household' && (
