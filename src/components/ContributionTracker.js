@@ -14,8 +14,9 @@ function AddContributionForm({ accounts, onAdd, onCancel }) {
   const [isLumpSum, setIsLumpSum] = useState(false);
   const [note,      setNote]      = useState('');
 
-  const investmentTypes = ['roth_ira','traditional_ira','401k','roth_401k','403b','hsa','brokerage','reit','crypto','savings'];
-  const eligibleAccounts = accounts.filter((a) => investmentTypes.includes(a.type));
+  // Show ALL accounts — credit cards and loans excluded (payments go through Debt tab)
+  const excludedTypes = ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'];
+  const eligibleAccounts = accounts.filter((a) => !excludedTypes.includes(a.type));
 
   const handleAdd = () => {
     if (!accountId || !amount || Number(amount) <= 0) return;
@@ -172,8 +173,8 @@ export default function ContributionTracker({ compact = false }) {
   const combinedTotal = vadimTotal + jessicaTotal;
 
   // Per-account breakdown (all time, grouped)
-  const investmentTypes = ['roth_ira','traditional_ira','401k','roth_401k','403b','hsa','brokerage','reit','crypto','savings'];
-  const trackedAccounts = accounts.filter((a) => investmentTypes.includes(a.type));
+  const excludedTypes = ['credit', 'store_credit', 'mortgage', 'auto_loan', 'personal_loan', 'student_loan'];
+  const trackedAccounts = accounts.filter((a) => !excludedTypes.includes(a.type));
 
   const accountStats = trackedAccounts.map((acct) => {
     const entries = allEntries.filter((e) => e.accountId === acct.id);
