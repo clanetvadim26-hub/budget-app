@@ -37,8 +37,8 @@ const pct = (n) => n.toFixed(2) + '%';
 function getOrdinaryTax(income, status) {
   // 2026 federal income tax brackets
   const brackets = {
-    Single: [[11925, 0.10], [48475, 0.12], [103350, 0.22], [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37]],
-    MFJ:    [[23850, 0.10], [96950, 0.12], [206700, 0.22], [394600, 0.24], [501050, 0.32], [751600, 0.35], [Infinity, 0.37]],
+    Single: [[12075, 0.10], [49050, 0.12], [99575, 0.22], [195250, 0.24], [276850, 0.32], [346875, 0.35], [Infinity, 0.37]],
+    MFJ:    [[24150, 0.10], [98100, 0.12], [199150, 0.22], [390500, 0.24], [553700, 0.32], [693750, 0.35], [Infinity, 0.37]],
   };
   const b = brackets[status] || brackets.Single;
   let tax = 0, prev = 0;
@@ -51,9 +51,9 @@ function getOrdinaryTax(income, status) {
 }
 
 function getLTCGRate(income, status) {
-  // 2026 long-term capital gains thresholds (estimated)
-  if (status === 'Single') { return income <= 49650 ? 0 : income <= 549250 ? 0.15 : 0.20; }
-  return income <= 99300 ? 0 : income <= 600050 ? 0.15 : 0.20;
+  // 2026 long-term capital gains thresholds
+  if (status === 'Single') { return income <= 48350 ? 0 : income <= 533400 ? 0.15 : 0.20; }
+  return income <= 96700 ? 0 : income <= 600050 ? 0.15 : 0.20;
 }
 
 const DEFAULTS = { purchasePrice: '', salePrice: '', holdPeriod: 'long', filingStatus: 'Single', annualIncome: '' };
@@ -108,7 +108,7 @@ export default function CapitalGainsCalc() {
   return (
     <div style={S.wrap}>
       <div style={S.title}>Capital Gains Tax Calculator</div>
-      <div style={S.sub}>Estimate your federal capital gains tax based on 2024 rates</div>
+      <div style={S.sub}>Estimate your federal capital gains tax based on 2026 rates</div>
 
       <div style={S.grid}>
         <div style={S.card}>
@@ -182,7 +182,7 @@ export default function CapitalGainsCalc() {
           </div>
 
           <div style={S.noteBox}>
-            <strong style={{ color: '#94A3B8' }}>Note:</strong> Uses 2024 federal rates only. State taxes, the 3.8% Net Investment Income Tax (NIIT), and AMT are not included. Consult a tax professional for personalized advice.
+            <strong style={{ color: '#94A3B8' }}>Note:</strong> Uses 2026 federal rates. MFJ LTCG: 0% ≤$96,700 / 15% ≤$600,050 / 20% above. State taxes, the 3.8% Net Investment Income Tax (NIIT), and AMT are not included. Consult a tax professional for personalized advice.
           </div>
         </>
       )}

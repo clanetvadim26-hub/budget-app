@@ -93,8 +93,8 @@ export default function HSACalc() {
           <div>
             <label style={lbl}>Coverage Type</label>
             <select style={inp} value={coverageType} onChange={e => setCoverageType(e.target.value)}>
-              <option value="single">Individual — 2024 limit: $4,150</option>
-              <option value="family">Family — 2024 limit: $8,300</option>
+              <option value="single">Individual — 2026 limit: $4,300</option>
+              <option value="family">Family — 2026 limit: $8,550</option>
             </select>
           </div>
           <div>

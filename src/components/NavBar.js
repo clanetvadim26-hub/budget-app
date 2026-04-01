@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { id: 'calculators',  label: 'Calculators',  icon: '🧮' },
   { id: 'add-expense',  label: 'Add Expense',  icon: '➕' },
   { id: 'add-income',   label: 'Add Income',   icon: '💵' },
-  { id: 'paycheck',     label: 'Paycheck',     icon: '💸' },
   { id: 'advice',       label: 'Advice',       icon: '💡' },
 ];
 

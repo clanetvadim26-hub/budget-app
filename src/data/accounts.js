@@ -229,7 +229,7 @@ export const DEFAULT_ACCOUNTS = [
   },
   {
     id: 'crypto_coinbase_vadim',
-    name: 'Coinbase',
+    name: 'Crypto',
     owner: 'Vadim',
     type: 'crypto',
     institution: 'Coinbase',

@@ -472,8 +472,167 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
   );
 }
 
+// ── JESSICA PAYCHECK ENTRY ────────────────────────────────────────────────────
+function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
+  const [amount, setAmount] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [confirmedAccounts, setConfirmedAccounts] = useState({});
+
+  const getPercent = (key) => Number(parseJson(settings[key], 0));
+  const housePercent    = getPercent('jessica_alloc_household') || 40;
+  const savingsPercent  = getPercent('jessica_alloc_savings')   || 10;
+  const rothPercent     = getPercent('jessica_alloc_roth')      || 10;
+  const personalPercent = getPercent('jessica_alloc_personal')  || 40;
+  const reservePct      = getPercent('jessica_1099_reserve_pct') || 25;
+
+  const paycheck    = Number(amount) || 0;
+  const afterReserve = reservePct > 0 ? paycheck * (1 - reservePct / 100) : paycheck;
+  const taxReserve  = paycheck - afterReserve;
+
+  const alloc = {
+    household: afterReserve * (housePercent / 100),
+    savings:   afterReserve * (savingsPercent / 100),
+    rothIRA:   afterReserve * (rothPercent / 100),
+    personal:  afterReserve * (personalPercent / 100),
+  };
+
+  const jessica401kFixed = Number(parseJson(settings['jessica_401k_fixed_monthly'], 0));
+
+  const allocationLines = [
+    { key: 'household', label: '🏠 Household Contribution',   color: '#60A5FA', accountId: null,                amount: alloc.household, isHousehold: true },
+    { key: 'savings',   label: '💰 Capital One Joint Savings', color: '#4ADE80', accountId: 'cap1_joint_savings', amount: alloc.savings },
+    { key: 'rothIRA',   label: '📈 Jessica Roth IRA',          color: '#D4AF37', accountId: 'roth_ira_jessica',   amount: alloc.rothIRA },
+    { key: 'personal',  label: '👩 Personal Spending',          color: '#F472B6', accountId: null,                amount: alloc.personal, isPersonal: true },
+  ];
+
+  if (jessica401kFixed > 0) {
+    allocationLines.splice(2, 0, {
+      key: '401k', label: '🏛️ Jessica 401k', color: '#A78BFA',
+      accountId: '401k_jessica', amount: jessica401kFixed, isFixed: true,
+    });
+  }
+
+  const handleConfirmLine = (line, customAmount) => {
+    if (!line.accountId) return;
+    const finalAmount = customAmount !== undefined ? customAmount : line.amount;
+    onContributionConfirmed(line.accountId, finalAmount, line.label);
+    setConfirmedAccounts(prev => ({ ...prev, [line.key]: finalAmount }));
+  };
+
+  if (!submitted) {
+    return (
+      <div className="jessica-paycheck-inline">
+        <div className="jessica-paycheck-header">
+          <span style={{ fontSize: 16, fontWeight: 700, color: '#F472B6' }}>💸 Log Paycheck</span>
+          <span style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>Enter your paycheck to see allocation</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+          <span style={{ fontSize: 20, color: '#D4AF37', fontWeight: 700 }}>$</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            style={{
+              background: '#0F1829',
+              border: '1px solid #2D3F55',
+              borderRadius: 8,
+              color: '#F1F5F9',
+              fontSize: 22,
+              fontWeight: 700,
+              padding: '8px 14px',
+              width: 180,
+            }}
+          />
+          <button
+            className="pa-confirm-btn"
+            style={{ padding: '10px 20px', fontSize: 14 }}
+            onClick={() => { if (paycheck > 0) setSubmitted(true); }}
+            disabled={paycheck <= 0}
+          >
+            See Allocation →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="jessica-paycheck-inline jessica-paycheck-alloc">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: '#F472B6' }}>
+          💸 Paycheck: ${paycheck.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <button
+          onClick={() => { setSubmitted(false); setConfirmedAccounts({}); }}
+          style={{ background: 'transparent', border: '1px solid #2D3F55', borderRadius: 6, color: '#94A3B8', fontSize: 12, padding: '4px 10px', cursor: 'pointer' }}
+        >
+          ← Edit Amount
+        </button>
+      </div>
+
+      {reservePct > 0 && taxReserve > 0 && (
+        <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12 }}>
+          <span style={{ color: '#F87171', fontWeight: 700 }}>🧾 Tax Reserve ({reservePct}%): ${taxReserve.toFixed(2)}</span>
+          <span style={{ color: '#94A3B8', marginLeft: 8 }}>Set aside before allocation. Spendable: ${afterReserve.toFixed(2)}</span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {allocationLines.map((line) => {
+          const isConfirmed = confirmedAccounts[line.key] !== undefined;
+          const isConfirmable = !!line.accountId && !line.isHousehold && !line.isPersonal;
+          return (
+            <div key={line.key} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: isConfirmed ? 'rgba(74,222,128,0.06)' : '#0F1829',
+              border: `1px solid ${isConfirmed ? 'rgba(74,222,128,0.25)' : '#1E293B'}`,
+              borderRadius: 10, padding: '10px 14px',
+            }}>
+              <div>
+                <span style={{ color: line.color, fontWeight: 600, fontSize: 14 }}>{line.label}</span>
+                {line.isFixed && <span style={{ fontSize: 10, color: '#A78BFA', marginLeft: 6, background: 'rgba(167,139,250,0.15)', borderRadius: 4, padding: '1px 5px' }}>fixed</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: line.color, fontWeight: 800, fontSize: 16 }}>
+                  ${line.amount.toFixed(2)}
+                </span>
+                {isConfirmable && !isConfirmed && (
+                  <button
+                    onClick={() => handleConfirmLine(line)}
+                    style={{
+                      background: 'rgba(74,222,128,0.15)',
+                      border: '1px solid rgba(74,222,128,0.3)',
+                      borderRadius: 6, color: '#4ADE80', fontSize: 11,
+                      padding: '4px 10px', cursor: 'pointer',
+                    }}
+                  >
+                    ✓ Confirm
+                  </button>
+                )}
+                {isConfirmed && (
+                  <span style={{ color: '#4ADE80', fontSize: 12 }}>✓ Logged</span>
+                )}
+                {(line.isHousehold || line.isPersonal) && (
+                  <span style={{ color: '#475569', fontSize: 11 }}>cash</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: 11, color: '#64748B', textAlign: 'center' }}>
+        Confirming an account contribution will update its balance and log the contribution.
+      </div>
+    </div>
+  );
+}
+
 // ── JESSICA VIEW ──────────────────────────────────────────────────────────────
-function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses, accounts, setAccounts }) {
+function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpenses, accounts, setAccounts, onContributionConfirmed }) {
   const [addingAlloc, setAddingAlloc] = useState(false);
   const [newAllocLabel, setNewAllocLabel] = useState('');
   const [newAllocPct, setNewAllocPct]     = useState('');
@@ -566,8 +725,18 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
 
   const totalJessicaSavings = jessicaSavingsList.reduce((s, sv) => s + (Number(settings[sv.key]) || 0), 0);
 
+  const jessica401kFixed = Number(parseJson(settings['jessica_401k_fixed_monthly'], 0));
+  const totalJessicaSavingsWithFixed = totalJessicaSavings + jessica401kFixed;
+
   return (
     <div className="fbp-view">
+      {/* ── Paycheck Entry ── */}
+      <JessicaPaycheckEntry
+        accounts={accounts}
+        settings={settings}
+        onContributionConfirmed={onContributionConfirmed}
+      />
+
       {/* ── Income ── */}
       <div className="fbp-section">
         <SectionHeader title="Income (Variable)" icon="💰" total={estMonthly} totalColor="#4ADE80" />
@@ -664,7 +833,7 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
 
       {/* ── Savings & Investments ── */}
       <div className="fbp-section">
-        <SectionHeader title="Savings & Investments" icon="📈" total={totalJessicaSavings} totalColor="#4ADE80" />
+        <SectionHeader title="Savings & Investments" icon="📈" total={totalJessicaSavingsWithFixed} totalColor="#4ADE80" />
         <div className="fbp-table fbp-savings-table">
           <div className="fbp-table-head fbp-savings-head">
             <span>Account</span><span>Monthly</span><span>Linked</span><span />
@@ -686,11 +855,27 @@ function JessicaView({ settings, setSetting, recurringExpenses, setRecurringExpe
               </div>
             );
           })}
+          <div className="fbp-table-row" style={{ borderTop: '1px solid #1E293B', paddingTop: 8, marginTop: 4 }}>
+            <span className="fbp-row-name" style={{ color: '#A78BFA' }}>
+              🏛️ Jessica 401k (fixed payroll deduction)
+              <span className="fbp-chip" style={{ background: 'rgba(167,139,250,0.15)', color: '#A78BFA', marginLeft: 6, fontSize: 10 }}>Fixed</span>
+            </span>
+            <InlineEdit
+              value={jessica401kFixed}
+              onSave={(v) => setSetting('jessica_401k_fixed_monthly', String(v))}
+              formatFn={formatCurrencyFull}
+              className="fbp-ie"
+              min={0}
+              step="1"
+            />
+            <span className="fbp-col-due fbp-subdued">per paycheck</span>
+            <span style={{ fontSize: 11, color: '#64748B' }}>not % based — deducted before allocation</span>
+          </div>
           <button className="fbp-add-btn" onClick={() => setShowAddSavings(true)}>＋ Add savings goal</button>
         </div>
       </div>
 
-      <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalJessicaSavings} />
+      <SummaryBar income={estMonthly} fixed={totalFixed} variable={0} savings={totalJessicaSavingsWithFixed} />
 
       {showAddSavings && (
         <AddSavingsModal accounts={accounts} onAdd={addJessicaSavingsEntry} onClose={() => setShowAddSavings(false)} keyPrefix="jessica_savings" />
@@ -815,7 +1000,40 @@ export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
   const [recurringExpenses, setRecurringExpenses] = useLocalStorage('budget_recurring_expenses', DEFAULT_RECURRING_EXPENSES);
   const [activeTab, setActiveTab] = useState(defaultTab);
 
-  const setSetting = (key, value) => setSettings(prev => ({ ...(prev||{}), [key]: value }));
+  const [contributionLog, setContributionLog] = useLocalStorage('budget_contribution_log', []);
+
+  const setSetting = (key, value) => {
+    setSettings(prev => {
+      const updates = { ...(prev || {}), [key]: value };
+      if (key === 'jessica_401k_fixed_monthly') {
+        updates['contrib_401k_jessica'] = value;
+      }
+      if (key === 'vadim_savings_401k_monthly') {
+        updates['contrib_401k_vadim'] = value;
+      }
+      return updates;
+    });
+  };
+
+  const handleJessicaContribution = (accountId, amount, label) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    setAccounts(prev => prev.map(a => {
+      if (a.id !== accountId) return a;
+      const newBalance = (a.balance || 0) + amount;
+      const history = [...(a.history || []), { date: format(new Date(), 'MMM d'), balance: newBalance }].slice(-24);
+      return { ...a, balance: newBalance, lastUpdated: format(new Date(), 'MMM d, yyyy'), history };
+    }));
+    const entry = {
+      id: `jessica_${accountId}_${Date.now()}`,
+      person: 'Jessica',
+      accountId,
+      accountName: label,
+      amount,
+      date: today,
+      source: 'paycheck_allocation',
+    };
+    setContributionLog(prev => [entry, ...(prev || [])].slice(0, 500));
+  };
 
   const TABS = [
     { id: 'vadim',     label: '👨 Vadim'     },
@@ -836,7 +1054,8 @@ export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
       )}
       {activeTab === 'jessica' && (
         <JessicaView settings={settings||{}} setSetting={setSetting} accounts={accounts} setAccounts={setAccounts}
-          recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses} />
+          recurringExpenses={recurringExpenses} setRecurringExpenses={setRecurringExpenses}
+          onContributionConfirmed={handleJessicaContribution} />
       )}
       {activeTab === 'household' && (
         <HouseholdView settings={settings||{}} accounts={accounts} recurringExpenses={recurringExpenses} />

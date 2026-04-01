@@ -14,7 +14,7 @@ const fmt = (v) => {
   return '$' + Math.round(Math.abs(v)).toLocaleString();
 };
 
-const FEDERAL_EXEMPTION = 13610000; // 2024
+const FEDERAL_EXEMPTION = 7000000; // 2026 — TCJA sunset reduced from $13.61M
 
 const calcFederalTax = (taxableEstate) => {
   if (taxableEstate <= 0) return 0;
@@ -94,7 +94,7 @@ export default function EstateCalc() {
     <div style={{ color: '#F1F5F9', fontFamily: 'inherit' }}>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Estate Tax Estimator</h2>
-        <p style={{ color: '#64748B', fontSize: 14, margin: 0 }}>Estimate federal and state estate tax liability (2024 exemptions)</p>
+        <p style={{ color: '#64748B', fontSize: 14, margin: 0 }}>Estimate federal and state estate tax liability (2026 — TCJA sunset, $7M exemption)</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -138,9 +138,9 @@ export default function EstateCalc() {
 
       <div style={{ ...card, marginBottom: 20, background: '#0A0F1E', border: '1px solid #334155' }}>
         <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.7 }}>
-          <strong style={{ color: '#D4AF37' }}>2024 Federal Exemption:</strong> $13.61M per person ($27.22M per married couple with portability).
+          <strong style={{ color: '#D4AF37' }}>2026 Federal Exemption:</strong> $7.0M per person (~$14M per married couple with portability) — TCJA sunset took effect.
           Estates below the exemption owe <strong style={{ color: '#4ADE80' }}>zero federal estate tax</strong>.
-          The exemption is scheduled to sunset after 2025 without Congressional action.
+          Top rate: 40%.
         </div>
       </div>
 
@@ -195,7 +195,7 @@ export default function EstateCalc() {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#D4AF37', marginBottom: 8 }}>Planning Note</div>
             <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.7 }}>
               This is a simplified estimate. Consult an estate planning attorney for complex situations involving trusts, business interests, or life insurance policies.
-              Consider irrevocable life insurance trusts (ILITs), charitable remainder trusts, and annual gifting ($18,000/recipient in 2024) to reduce taxable estate.
+              Consider irrevocable life insurance trusts (ILITs), charitable remainder trusts, and annual gifting ($19,000/recipient in 2026) to reduce taxable estate.
             </div>
           </div>
         </div>

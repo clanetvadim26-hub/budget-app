@@ -150,8 +150,19 @@ function AccountCard({ account, settings = {}, onSave, onDelete }) {
           <GoalProjection
             balance={account.balance}
             targetGoal={account.targetGoal}
-            monthlyContribution={account.monthlyContribution}
+            monthlyContribution={planContrib || account.monthlyContribution}
           />
+        </div>
+      )}
+
+      {account.history && account.history.length > 1 && !isCC && (
+        <div style={{ marginTop: 8, fontSize: 11, color: '#64748B' }}>
+          <span>Balance history: </span>
+          {account.history.slice(-4).map((h, i) => (
+            <span key={i} style={{ marginRight: 8 }}>
+              {h.date}: <span style={{ color: '#94A3B8' }}>${Number(h.balance).toLocaleString()}</span>
+            </span>
+          ))}
         </div>
       )}
 
@@ -495,16 +506,33 @@ export default function AccountsPanel() {
   const [netWorthHistory, setNetWorthHistory] = useLocalStorage('budget_networth_history', []);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // Migrate: add any missing default accounts — runs ONCE per device
+  // Migrate: add any missing default accounts + one-time renames — runs ONCE per device
   useEffect(() => {
-    const migrated = localStorage.getItem('budget_accounts_migrated');
-    if (migrated) return;
-    const existingIds = new Set(accounts.map((a) => a.id));
-    const missing = DEFAULT_ACCOUNTS.filter((a) => !existingIds.has(a.id));
-    if (missing.length > 0) {
-      setAccounts((prev) => [...prev, ...missing]);
+    // Rename 'Coinbase' → 'Crypto' if not yet done
+    const cryptoRenamed = localStorage.getItem('budget_crypto_renamed');
+    if (!cryptoRenamed) {
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === 'crypto_coinbase_vadim' && a.name === 'Coinbase'
+            ? { ...a, name: 'Crypto' }
+            : a
+        )
+      );
+      localStorage.setItem('budget_crypto_renamed', 'true');
     }
-    localStorage.setItem('budget_accounts_migrated', 'true');
+
+    const migrated = localStorage.getItem('budget_accounts_migrated_v2');
+    if (migrated) return;
+    setAccounts((prev) => {
+      const existingIds = new Set(prev.map((a) => a.id));
+      const missing = DEFAULT_ACCOUNTS.filter((a) => !existingIds.has(a.id));
+      if (missing.length === 0) {
+        localStorage.setItem('budget_accounts_migrated_v2', 'true');
+        return prev;
+      }
+      localStorage.setItem('budget_accounts_migrated_v2', 'true');
+      return [...prev, ...missing];
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

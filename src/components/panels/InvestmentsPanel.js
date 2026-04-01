@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ContributionTracker from '../ContributionTracker';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { DEFAULT_ACCOUNTS, ACCOUNT_TYPE_META, OWNER_COLORS } from '../../data/accounts';
@@ -350,6 +351,8 @@ export default function InvestmentsPanel() {
           </div>
         );
       })()}
+
+      <ContributionTracker />
     </div>
   );
 }

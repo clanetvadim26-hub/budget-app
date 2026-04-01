@@ -429,6 +429,13 @@ export const TABLE_CONFIG = {
     sync: (_, next) => syncStateItem('deferred_paychecks', next),
     realtimeTable: 'app_state',
   },
+  // Global contribution log — every confirmed contribution by person and account
+  budget_contribution_log: {
+    type: 'state', stateKey: 'contribution_log',
+    load: (key, def) => loadStateItem('contribution_log', key, def),
+    sync: (_, next) => syncStateItem('contribution_log', next),
+    realtimeTable: 'app_state',
+  },
   // Debt payment history — for autonomous balance tracking
   budget_debt_payments: {
     type: 'array', table: 'debt_payments',

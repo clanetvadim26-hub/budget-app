@@ -78,6 +78,7 @@ export default function App() {
   // Contribution confirmation persistence
   const [confirmedContributions, setConfirmedContributions] = useLocalStorage('budget_confirmed_contributions', {});
   const [deferredContributions, setDeferredContributions] = useLocalStorage('budget_deferred_contributions', {});
+  const [contributionLog, setContributionLog] = useLocalStorage('budget_contribution_log', []);
   const [settings] = useLocalStorage('budget_settings', {});
 
   // Session-dismissed modals (not persisted — resets on page reload)
@@ -476,16 +477,32 @@ export default function App() {
         !sessionDismissed.has(`contrib_dismiss_${pendingContributions[activeContribIndex]?.id}`) && (
         <ContributionConfirmationModal
           item={pendingContributions[activeContribIndex]}
+          recentConfirmed={Object.entries(confirmedContributions)
+            .filter(([k]) => k.includes(pendingContributions[activeContribIndex]?.accountId))
+            .map(([, v]) => ({ ...v, accountId: pendingContributions[activeContribIndex]?.accountId }))
+          }
           onConfirm={(item) => {
             const today = format(now, 'yyyy-MM-dd');
-            if (item.isDebt) {
-              const { accounts: updated } = applyPaymentToDebt(accounts, item.accountId, item.amount, today);
-              setAccounts(updated);
-            } else {
-              const updated = applyContributionToAccount(accounts, item.accountId, item.amount, today);
-              setAccounts(updated);
+            if (item.amount > 0) {
+              if (item.isDebt) {
+                const { accounts: updated } = applyPaymentToDebt(accounts, item.accountId, item.amount, today);
+                setAccounts(updated);
+              } else {
+                const updated = applyContributionToAccount(accounts, item.accountId, item.amount, today);
+                setAccounts(updated);
+              }
             }
-            setConfirmedContributions(prev => ({ ...prev, [item.id]: { confirmedDate: today } }));
+            const logEntry = {
+              id: `${item.id}_${Date.now()}`,
+              accountId: item.accountId,
+              accountName: item.accountName,
+              amount: item.amount,
+              confirmedDate: today,
+              isLumpSum: item.isLumpSum || false,
+              skipped: item.amount === 0,
+            };
+            setContributionLog(prev => [logEntry, ...(prev || [])].slice(0, 500));
+            setConfirmedContributions(prev => ({ ...prev, [item.id]: { confirmedDate: today, amount: item.amount } }));
             setActiveContribIndex(i => i + 1);
           }}
           onDefer={(id) => {

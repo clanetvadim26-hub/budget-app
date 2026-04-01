@@ -32,6 +32,10 @@ const CALCULATORS = [
   { id: 'disability',   title: 'Disability Income Gap',  icon: '🏥', category: 'Insurance & Estate',   desc: 'Monthly income gap, recommended coverage.' },
   { id: 'hsa',          title: 'HSA Growth Projector',   icon: '💊', category: 'Insurance & Estate',   desc: 'Projected balance, tax savings, vs out-of-pocket.' },
   { id: 'estate',       title: 'Estate Tax Estimator',   icon: '🏛️', category: 'Insurance & Estate',   desc: 'Federal and state estate tax, net estate value.' },
+  // Real Estate
+  { id: 'rent-vs-buy',  title: 'Rent vs. Buy',           icon: '🏡', category: 'Real Estate',          desc: 'Net wealth comparison, break-even year, 30-yr chart.' },
+  // Tax & Retirement
+  { id: 'tax-equiv-yield', title: 'Tax-Equiv. Yield',    icon: '🏷️', category: 'Tax & Retirement',     desc: 'Muni bond TEY across all 2026 federal brackets.' },
 ];
 
 const CATEGORY_COLORS = {
@@ -40,6 +44,7 @@ const CATEGORY_COLORS = {
   'Tax & Retirement':   '#D4AF37',
   'Financial Health':   '#60A5FA',
   'Insurance & Estate': '#A78BFA',
+  'Real Estate':        '#38BDF8',
 };
 
 // Lazy-load calculator components
@@ -70,6 +75,8 @@ const calcComponents = {
   'disability':   lazy(() => import('../calculators/DisabilityCalc')),
   'hsa':          lazy(() => import('../calculators/HSACalc')),
   'estate':       lazy(() => import('../calculators/EstateCalc')),
+  'rent-vs-buy':  lazy(() => import('../calculators/RentVsBuyCalc')),
+  'tax-equiv-yield': lazy(() => import('../calculators/TaxEquivYieldCalc')),
 };
 
 export default function CalculatorsPanel() {

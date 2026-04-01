@@ -39,10 +39,11 @@ const pct = (n) => (typeof n === 'number' ? n.toFixed(1) : '0.0') + '%';
 
 const STANDARD_DEDUCTIONS = { Single: 15000, MFJ: 30000, HOH: 22500 };
 
+// 2026 federal tax brackets (IRS)
 const BRACKETS = {
-  Single: [[11925, 0.10], [48475, 0.12], [103350, 0.22], [197300, 0.24], [250525, 0.32], [626350, 0.35], [Infinity, 0.37]],
-  MFJ:    [[23850, 0.10], [96950, 0.12], [206700, 0.22], [394600, 0.24], [501050, 0.32], [751600, 0.35], [Infinity, 0.37]],
-  HOH:    [[17000, 0.10], [64850, 0.12], [103350, 0.22], [197300, 0.24], [250500, 0.32], [626350, 0.35], [Infinity, 0.37]],
+  Single: [[12075, 0.10], [49050, 0.12], [99575, 0.22], [195250, 0.24], [276850, 0.32], [346875, 0.35], [Infinity, 0.37]],
+  MFJ:    [[24150, 0.10], [98100, 0.12], [199150, 0.22], [390500, 0.24], [553700, 0.32], [693750, 0.35], [Infinity, 0.37]],
+  HOH:    [[17100, 0.10], [65150, 0.12], [104200, 0.22], [197950, 0.24], [251950, 0.32], [629150, 0.35], [Infinity, 0.37]],
 };
 
 function calcTax(taxableIncome, status) {
@@ -216,7 +217,7 @@ export default function TaxRateCalc() {
           </div>
 
           <div style={S.noteBox}>
-            <strong style={{ color: '#94A3B8' }}>Note:</strong> 2024 federal brackets only. Does not include FICA, state/local taxes, AMT, credits, or other adjustments. Standard deductions: Single ${STANDARD_DEDUCTIONS.Single.toLocaleString()}, MFJ ${STANDARD_DEDUCTIONS.MFJ.toLocaleString()}, HOH ${STANDARD_DEDUCTIONS.HOH.toLocaleString()}.
+            <strong style={{ color: '#94A3B8' }}>Note:</strong> 2026 federal brackets only. Does not include FICA, state/local taxes, AMT, credits, or other adjustments. Standard deductions: Single ${STANDARD_DEDUCTIONS.Single.toLocaleString()}, MFJ ${STANDARD_DEDUCTIONS.MFJ.toLocaleString()}, HOH ${STANDARD_DEDUCTIONS.HOH.toLocaleString()}.
           </div>
         </>
       )}

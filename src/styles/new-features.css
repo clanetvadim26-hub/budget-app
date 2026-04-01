@@ -3223,3 +3223,19 @@ input, select, textarea {
 /* ── Calendar Event Delete ───────────────────────────── */
 .cal-event-delete { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 6px; opacity: 0.5; transition: 0.15s; flex-shrink: 0; }
 .cal-event-delete:hover { opacity: 1; background: rgba(248,113,113,0.15); }
+
+/* ── Jessica Paycheck Entry ──────────────────────────── */
+.jessica-paycheck-inline {
+  background: linear-gradient(135deg, #0F1829 0%, #0A1020 100%);
+  border: 1px solid rgba(244, 114, 182, 0.2);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+.jessica-paycheck-alloc {
+  border-color: rgba(244, 114, 182, 0.35);
+}
+.jessica-paycheck-header {
+  display: flex;
+  align-items: center;
+}
