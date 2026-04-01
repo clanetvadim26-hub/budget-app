@@ -473,38 +473,59 @@ function VadimView({ settings, setSetting, accounts, setAccounts, recurringExpen
 }
 
 // ── JESSICA PAYCHECK ENTRY ────────────────────────────────────────────────────
+const JESSICA_JOBS = [
+  {
+    id: 'orange_theory',
+    label: 'Orange Theory',
+    icon: '🏋️',
+    color: '#FB923C',
+    is1099: false,
+    description: 'W-2 · No tax reserve',
+  },
+  {
+    id: 'competitive_edge',
+    label: 'Competitive Edge LLC',
+    icon: '💼',
+    color: '#60A5FA',
+    is1099: true,
+    description: '1099 · 25% tax reserve applied',
+  },
+];
+
 function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
-  const [amount, setAmount] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [step, setStep]       = useState('job');   // 'job' | 'amount' | 'alloc'
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [amount, setAmount]   = useState('');
   const [confirmedAccounts, setConfirmedAccounts] = useState({});
+
+  const job = JESSICA_JOBS.find((j) => j.id === selectedJob);
 
   const getPercent = (key) => Number(parseJson(settings[key], 0));
   const housePercent    = getPercent('jessica_alloc_household') || 40;
   const savingsPercent  = getPercent('jessica_alloc_savings')   || 10;
   const rothPercent     = getPercent('jessica_alloc_roth')      || 10;
   const personalPercent = getPercent('jessica_alloc_personal')  || 40;
-  const reservePct      = getPercent('jessica_1099_reserve_pct') || 25;
 
-  const paycheck    = Number(amount) || 0;
-  const afterReserve = reservePct > 0 ? paycheck * (1 - reservePct / 100) : paycheck;
-  const taxReserve  = paycheck - afterReserve;
+  const reservePct   = job?.is1099 ? 25 : 0;
+  const paycheck     = Number(amount) || 0;
+  const taxReserve   = paycheck * (reservePct / 100);
+  const afterReserve = paycheck - taxReserve;
 
   const alloc = {
-    household: afterReserve * (housePercent / 100),
+    household: afterReserve * (housePercent  / 100),
     savings:   afterReserve * (savingsPercent / 100),
-    rothIRA:   afterReserve * (rothPercent / 100),
+    rothIRA:   afterReserve * (rothPercent   / 100),
     personal:  afterReserve * (personalPercent / 100),
   };
 
   const jessica401kFixed = Number(parseJson(settings['jessica_401k_fixed_monthly'], 0));
 
   const allocationLines = [
-    { key: 'household', label: '🏠 Household Contribution',   color: '#60A5FA', accountId: null,                amount: alloc.household, isHousehold: true },
+    { key: 'household', label: '🏠 Household Contribution',   color: '#60A5FA', accountId: null,                amount: alloc.household,  isHousehold: true },
     { key: 'savings',   label: '💰 Capital One Joint Savings', color: '#4ADE80', accountId: 'cap1_joint_savings', amount: alloc.savings },
     { key: 'rothIRA',   label: '📈 Jessica Roth IRA',          color: '#D4AF37', accountId: 'roth_ira_jessica',   amount: alloc.rothIRA },
-    { key: 'personal',  label: '👩 Personal Spending',          color: '#F472B6', accountId: null,                amount: alloc.personal, isPersonal: true },
+    { key: 'personal',  label: '👩 Personal Spending',          color: '#F472B6', accountId: null,                amount: alloc.personal,  isPersonal: true },
   ];
-
   if (jessica401kFixed > 0) {
     allocationLines.splice(2, 0, {
       key: '401k', label: '🏛️ Jessica 401k', color: '#A78BFA',
@@ -512,21 +533,75 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
     });
   }
 
-  const handleConfirmLine = (line, customAmount) => {
+  const handleConfirmLine = (line) => {
     if (!line.accountId) return;
-    const finalAmount = customAmount !== undefined ? customAmount : line.amount;
-    onContributionConfirmed(line.accountId, finalAmount, line.label);
-    setConfirmedAccounts(prev => ({ ...prev, [line.key]: finalAmount }));
+    onContributionConfirmed(line.accountId, line.amount, line.label, 'Jessica');
+    setConfirmedAccounts((prev) => ({ ...prev, [line.key]: line.amount }));
   };
 
-  if (!submitted) {
+  const reset = () => {
+    setStep('job');
+    setSelectedJob(null);
+    setAmount('');
+    setConfirmedAccounts({});
+  };
+
+  // ── Step 1: Job selector ──────────────────────────────────────────────
+  if (step === 'job') {
     return (
       <div className="jessica-paycheck-inline">
         <div className="jessica-paycheck-header">
           <span style={{ fontSize: 16, fontWeight: 700, color: '#F472B6' }}>💸 Log Paycheck</span>
-          <span style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>Enter your paycheck to see allocation</span>
+          <span style={{ fontSize: 12, color: '#64748B', marginLeft: 8 }}>Which job is this paycheck from?</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {JESSICA_JOBS.map((j) => (
+            <button
+              key={j.id}
+              onClick={() => { setSelectedJob(j.id); setStep('amount'); }}
+              style={{
+                flex: 1,
+                background: '#0A1020',
+                border: `2px solid ${j.color}44`,
+                borderRadius: 12,
+                padding: '14px 12px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = j.color}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = `${j.color}44`}
+            >
+              <div style={{ fontSize: 22, marginBottom: 6 }}>{j.icon}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: j.color, marginBottom: 4 }}>{j.label}</div>
+              <div style={{ fontSize: 11, color: '#64748B' }}>{j.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 2: Amount entry ──────────────────────────────────────────────
+  if (step === 'amount') {
+    return (
+      <div className="jessica-paycheck-inline">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 18 }}>{job?.icon}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: job?.color }}>{job?.label}</span>
+          {job?.is1099 && (
+            <span style={{ fontSize: 11, background: 'rgba(248,113,113,0.12)', color: '#F87171', borderRadius: 6, padding: '2px 8px' }}>
+              1099 · 25% reserved for taxes
+            </span>
+          )}
+          <button onClick={reset} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#475569', fontSize: 12, cursor: 'pointer' }}>
+            ← Change job
+          </button>
+        </div>
+        <label style={{ fontSize: 12, color: '#94A3B8', display: 'block', marginBottom: 6 }}>
+          How much was this paycheck?
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 20, color: '#D4AF37', fontWeight: 700 }}>$</span>
           <input
             type="number"
@@ -535,12 +610,13 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            autoFocus
             style={{
               background: '#0F1829',
               border: '1px solid #2D3F55',
               borderRadius: 8,
               color: '#F1F5F9',
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: 700,
               padding: '8px 14px',
               width: 180,
@@ -549,40 +625,50 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
           <button
             className="pa-confirm-btn"
             style={{ padding: '10px 20px', fontSize: 14 }}
-            onClick={() => { if (paycheck > 0) setSubmitted(true); }}
+            onClick={() => { if (paycheck > 0) setStep('alloc'); }}
             disabled={paycheck <= 0}
           >
             See Allocation →
           </button>
         </div>
+        {job?.is1099 && paycheck > 0 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#F87171' }}>
+            🧾 Tax reserve (25%): <strong>${taxReserve.toFixed(2)}</strong> · Spendable: <strong style={{ color: '#4ADE80' }}>${afterReserve.toFixed(2)}</strong>
+          </div>
+        )}
       </div>
     );
   }
 
+  // ── Step 3: Allocation + confirm ──────────────────────────────────────
   return (
     <div className="jessica-paycheck-inline jessica-paycheck-alloc">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: '#F472B6' }}>
-          💸 Paycheck: ${paycheck.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>{job?.icon}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: job?.color }}>{job?.label}</span>
+          <span style={{ fontSize: 14, color: '#D4AF37', fontWeight: 800, marginLeft: 4 }}>
+            ${paycheck.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
         <button
-          onClick={() => { setSubmitted(false); setConfirmedAccounts({}); }}
+          onClick={() => setStep('amount')}
           style={{ background: 'transparent', border: '1px solid #2D3F55', borderRadius: 6, color: '#94A3B8', fontSize: 12, padding: '4px 10px', cursor: 'pointer' }}
         >
-          ← Edit Amount
+          ← Edit
         </button>
       </div>
 
-      {reservePct > 0 && taxReserve > 0 && (
+      {reservePct > 0 && (
         <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12 }}>
-          <span style={{ color: '#F87171', fontWeight: 700 }}>🧾 Tax Reserve ({reservePct}%): ${taxReserve.toFixed(2)}</span>
-          <span style={{ color: '#94A3B8', marginLeft: 8 }}>Set aside before allocation. Spendable: ${afterReserve.toFixed(2)}</span>
+          <span style={{ color: '#F87171', fontWeight: 700 }}>🧾 Tax Reserve (25%): ${taxReserve.toFixed(2)}</span>
+          <span style={{ color: '#94A3B8', marginLeft: 8 }}>Spendable after reserve: ${afterReserve.toFixed(2)}</span>
         </div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {allocationLines.map((line) => {
-          const isConfirmed = confirmedAccounts[line.key] !== undefined;
+          const isConfirmed   = confirmedAccounts[line.key] !== undefined;
           const isConfirmable = !!line.accountId && !line.isHousehold && !line.isPersonal;
           return (
             <div key={line.key} style={{
@@ -602,31 +688,25 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
                 {isConfirmable && !isConfirmed && (
                   <button
                     onClick={() => handleConfirmLine(line)}
-                    style={{
-                      background: 'rgba(74,222,128,0.15)',
-                      border: '1px solid rgba(74,222,128,0.3)',
-                      borderRadius: 6, color: '#4ADE80', fontSize: 11,
-                      padding: '4px 10px', cursor: 'pointer',
-                    }}
+                    style={{ background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 6, color: '#4ADE80', fontSize: 11, padding: '4px 10px', cursor: 'pointer' }}
                   >
                     ✓ Confirm
                   </button>
                 )}
-                {isConfirmed && (
-                  <span style={{ color: '#4ADE80', fontSize: 12 }}>✓ Logged</span>
-                )}
-                {(line.isHousehold || line.isPersonal) && (
-                  <span style={{ color: '#475569', fontSize: 11 }}>cash</span>
-                )}
+                {isConfirmed && <span style={{ color: '#4ADE80', fontSize: 12 }}>✓ Logged</span>}
+                {(line.isHousehold || line.isPersonal) && <span style={{ color: '#475569', fontSize: 11 }}>cash</span>}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 10, fontSize: 11, color: '#64748B', textAlign: 'center' }}>
-        Confirming an account contribution will update its balance and log the contribution.
-      </div>
+      <button
+        onClick={reset}
+        style={{ marginTop: 12, background: 'transparent', border: 'none', color: '#475569', fontSize: 12, cursor: 'pointer', display: 'block', width: '100%', textAlign: 'center' }}
+      >
+        Log another paycheck
+      </button>
     </div>
   );
 }
@@ -1015,7 +1095,7 @@ export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
     });
   };
 
-  const handleJessicaContribution = (accountId, amount, label) => {
+  const handleJessicaContribution = (accountId, amount, label, person = 'Jessica') => {
     const today = format(new Date(), 'yyyy-MM-dd');
     setAccounts(prev => prev.map(a => {
       if (a.id !== accountId) return a;
@@ -1024,8 +1104,8 @@ export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
       return { ...a, balance: newBalance, lastUpdated: format(new Date(), 'MMM d, yyyy'), history };
     }));
     const entry = {
-      id: `jessica_${accountId}_${Date.now()}`,
-      person: 'Jessica',
+      id: `${person.toLowerCase()}_${accountId}_${Date.now()}`,
+      person,
       accountId,
       accountName: label,
       amount,

@@ -10,7 +10,8 @@
       "Bash(npx react-scripts:*)",
       "Bash(grep -l \"Cell\" /c/Users/clane/budget-app/src/components/calculators/*.js)",
       "Bash(xargs grep:*)",
-      "Bash(\"C:/Users/clane/budget-app/src/styles/new-features.css\":*)"
+      "Bash(\"C:/Users/clane/budget-app/src/styles/new-features.css\":*)",
+      "Bash(CI=false npm run build)"
     ]
   }
 }
