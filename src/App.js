@@ -78,7 +78,8 @@ export default function App() {
   const [confirmedContributions, setConfirmedContributions] = useLocalStorage('budget_confirmed_contributions', {});
   const [deferredContributions, setDeferredContributions] = useLocalStorage('budget_deferred_contributions', {});
   const [contributionLog, setContributionLog] = useLocalStorage('budget_contribution_log', []);
-  const [settings] = useLocalStorage('budget_settings', {});
+  const [settings, setSettings] = useLocalStorage('budget_settings', {});
+  const setSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
 
   // Session-dismissed modals (not persisted — resets on page reload)
   const [sessionDismissed, setSessionDismissed] = useState(new Set());
@@ -494,6 +495,14 @@ export default function App() {
             setContributionLog(prev => [logEntry, ...(prev || [])].slice(0, 500));
             setConfirmedContributions(prev => ({ ...prev, [item.id]: { confirmedDate: today, amount: item.amount } }));
             setActiveContribIndex(i => i + 1);
+            // Auto-advance payday if all contributions for this cycle are done and payday is past
+            if (activeContribIndex >= pendingContributions.length - 1) {
+              const currentPayday = settings['vadim_next_payday'];
+              if (currentPayday && currentPayday < today) {
+                const nextPayday = format(addDays(new Date(currentPayday + 'T12:00:00'), 14), 'yyyy-MM-dd');
+                setSetting('vadim_next_payday', nextPayday);
+              }
+            }
           }}
           onDefer={(id) => {
             const tomorrow = format(addDays(now, 1), 'yyyy-MM-dd');
@@ -505,12 +514,32 @@ export default function App() {
             setActiveContribIndex(i => i + 1);
           }}
           onSkipCycle={(id, accountId, currentBalance) => {
-            // Defer until next payday so it doesn't re-prompt this cycle
-            const nextPayday = settings['vadim_next_payday'] || format(addDays(now, 14), 'yyyy-MM-dd');
+            const contributionItem = pendingContributions[activeContribIndex];
+            const today = format(now, 'yyyy-MM-dd');
+
+            // Determine pay frequency and payday key based on account owner
+            let paydayKey = 'vadim_next_payday';
+            let payFrequencyDays = 14;
+            if (accountId === 'roth_ira_jessica' || accountId === '401k_jessica' || accountId === 'cap1_joint_savings_jessica') {
+              paydayKey = 'jessica_next_ce_payday';
+              payFrequencyDays = 14;
+            }
+
+            // Calculate next cycle's payday — add one pay period past current payday
+            const currentPayday = settings[paydayKey];
+            let deferUntil;
+            if (currentPayday) {
+              const nextCycleDate = addDays(new Date(currentPayday + 'T12:00:00'), payFrequencyDays);
+              deferUntil = format(nextCycleDate, 'yyyy-MM-dd');
+            } else {
+              deferUntil = format(addDays(now, payFrequencyDays), 'yyyy-MM-dd');
+            }
+
             setDeferredContributions(prev => ({
               ...prev,
-              [id]: { deferUntil: nextPayday, skippedCycle: true },
+              [id]: { deferUntil, skippedCycle: true },
             }));
+
             // Update account balance if user entered one
             if (currentBalance !== null && currentBalance >= 0) {
               setAccounts(prev => prev.map(a => {
@@ -519,17 +548,24 @@ export default function App() {
                 return { ...a, balance: currentBalance, lastUpdated: format(now, 'MMM d, yyyy'), history };
               }));
             }
+
             // Log the skip
-            const logEntry = {
-              id: `skip_${accountId}_${format(now, 'yyyy-MM-dd')}`,
+            setContributionLog(prev => [{
+              id: `skip_${accountId}_${today}`,
               accountId,
-              accountName: pendingContributions[activeContribIndex]?.accountName,
+              accountName: contributionItem?.accountName,
               amount: 0,
-              confirmedDate: format(now, 'yyyy-MM-dd'),
+              confirmedDate: today,
               skipped: true,
               skippedCycle: true,
-            };
-            setContributionLog(prev => [logEntry, ...(prev || [])].slice(0, 500));
+            }, ...(prev || [])].slice(0, 500));
+
+            // Auto-advance the payday date if it's stuck in the past
+            if (currentPayday && currentPayday < today) {
+              const nextPayday = format(addDays(new Date(currentPayday + 'T12:00:00'), payFrequencyDays), 'yyyy-MM-dd');
+              setSetting(paydayKey, nextPayday);
+            }
+
             setActiveContribIndex(i => i + 1);
           }}
         />
