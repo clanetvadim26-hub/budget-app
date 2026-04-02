@@ -20,7 +20,6 @@ const MORE_ITEMS = [
   { id: 'debt',        icon: '🔴', label: 'Debt'        },
   { id: 'recurring',   icon: '🔄', label: 'Recurring'   },
   { id: 'add-income',  icon: '💵', label: 'Add Income'  },
-  { id: 'advice',      icon: '💡', label: 'Advice'      },
 ];
 
 export default function MobileNav({ activeView, setActiveView, pendingCount }) {

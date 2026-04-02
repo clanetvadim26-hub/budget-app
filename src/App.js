@@ -21,7 +21,6 @@ import CashFlowPanel from './components/panels/CashFlowPanel';
 import CalculatorsPanel from './components/panels/CalculatorsPanel';
 import AddExpenseForm from './components/forms/AddExpenseForm';
 import AddIncomeForm from './components/forms/AddIncomeForm';
-import FinancialAdvicePanel from './components/panels/FinancialAdvicePanel';
 import AccountsPanel from './components/panels/AccountsPanel';
 import InvestmentsPanel from './components/panels/InvestmentsPanel';
 import DebtPanel from './components/panels/DebtPanel';
@@ -404,15 +403,6 @@ export default function App() {
             </div>
           </div>
         );
-      case 'advice':
-        return (
-          <FinancialAdvicePanel
-            income={totalIncome}
-            expenses={totalExpenses}
-            savingsRate={savingsRate}
-            monthlyIncome={monthlyIncome}
-          />
-        );
       default:
         return null;
     }
@@ -512,6 +502,34 @@ export default function App() {
           }}
           onDismiss={(id) => {
             dismissModal(`contrib_dismiss_${id}`);
+            setActiveContribIndex(i => i + 1);
+          }}
+          onSkipCycle={(id, accountId, currentBalance) => {
+            // Defer until next payday so it doesn't re-prompt this cycle
+            const nextPayday = settings['vadim_next_payday'] || format(addDays(now, 14), 'yyyy-MM-dd');
+            setDeferredContributions(prev => ({
+              ...prev,
+              [id]: { deferUntil: nextPayday, skippedCycle: true },
+            }));
+            // Update account balance if user entered one
+            if (currentBalance !== null && currentBalance >= 0) {
+              setAccounts(prev => prev.map(a => {
+                if (a.id !== accountId) return a;
+                const history = [...(a.history || []), { date: format(now, 'MMM d'), balance: currentBalance }].slice(-24);
+                return { ...a, balance: currentBalance, lastUpdated: format(now, 'MMM d, yyyy'), history };
+              }));
+            }
+            // Log the skip
+            const logEntry = {
+              id: `skip_${accountId}_${format(now, 'yyyy-MM-dd')}`,
+              accountId,
+              accountName: pendingContributions[activeContribIndex]?.accountName,
+              amount: 0,
+              confirmedDate: format(now, 'yyyy-MM-dd'),
+              skipped: true,
+              skippedCycle: true,
+            };
+            setContributionLog(prev => [logEntry, ...(prev || [])].slice(0, 500));
             setActiveContribIndex(i => i + 1);
           }}
         />

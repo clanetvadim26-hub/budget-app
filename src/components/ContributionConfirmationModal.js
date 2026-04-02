@@ -1,25 +1,100 @@
 import React, { useState } from 'react';
 import { formatCurrency } from '../utils/calculations';
 
-export default function ContributionConfirmationModal({ item, onConfirm, onDefer, onDismiss, recentConfirmed = [] }) {
+export default function ContributionConfirmationModal({
+  item,
+  onConfirm,
+  onDefer,
+  onDismiss,
+  onSkipCycle,
+  recentConfirmed = [],
+}) {
   const [editedAmount, setEditedAmount] = useState(String(item.amount));
-  const [isLumpSum, setIsLumpSum] = useState(false);
+  const [isLumpSum, setIsLumpSum]       = useState(false);
+  const [showSkipForm, setShowSkipForm] = useState(false);
+  const [currentBalance, setCurrentBalance] = useState('');
 
-  // Duplicate detection: was this exact account+amount confirmed in the last 35 days?
   const isDuplicate = recentConfirmed.some(
     (c) =>
       c.accountId === item.accountId &&
       Math.abs(Number(c.amount) - Number(editedAmount)) < 0.01 &&
-      c.confirmedDate // already confirmed once
+      c.confirmedDate
   );
 
   const parsedAmount = Math.max(0, Number(editedAmount) || 0);
-  const isZero = parsedAmount === 0;
+  const isZero       = parsedAmount === 0;
 
   const handleConfirm = () => {
     onConfirm({ ...item, amount: parsedAmount, isLumpSum });
   };
 
+  const handleSkipCycleSubmit = () => {
+    const bal = Number(currentBalance);
+    onSkipCycle(item.id, item.accountId, isNaN(bal) ? null : bal);
+  };
+
+  // ── Skip-cycle sub-form ──────────────────────────────────────────────
+  if (showSkipForm) {
+    return (
+      <div className="pa-overlay" style={{ zIndex: 9000 }}>
+        <div className="pa-modal" style={{ maxWidth: 420 }}>
+          <div className="pa-header">
+            <div>
+              <div className="pa-subtitle">⏭ Skipping This Paycheck</div>
+              <div className="pa-title">{item.label}</div>
+            </div>
+          </div>
+          <div style={{ padding: '20px 20px 8px' }}>
+            <p style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20, lineHeight: 1.6 }}>
+              Got it — no contribution this cycle. We won't ask again until your next paycheck.
+              <br /><br />
+              What is the <strong style={{ color: '#F1F5F9' }}>current balance</strong> of{' '}
+              <strong style={{ color: '#D4AF37' }}>{item.accountName}</strong>?
+              This keeps your account balance accurate.
+            </p>
+            <label style={{ fontSize: 12, color: '#94A3B8', display: 'block', marginBottom: 6 }}>
+              CURRENT BALANCE (leave blank to skip)
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <span style={{ fontSize: 20, color: '#D4AF37', fontWeight: 700 }}>$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 430.00"
+                value={currentBalance}
+                onChange={(e) => setCurrentBalance(e.target.value)}
+                autoFocus
+                style={{
+                  background: '#0F1829',
+                  border: '1px solid #2D3F55',
+                  borderRadius: 8,
+                  color: '#F1F5F9',
+                  fontSize: 22,
+                  fontWeight: 700,
+                  padding: '6px 12px',
+                  width: '100%',
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button className="pa-confirm-btn" onClick={handleSkipCycleSubmit}>
+              ✓ Confirm &amp; Skip This Cycle
+            </button>
+            <button
+              onClick={() => setShowSkipForm(false)}
+              style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', padding: '6px 0' }}
+            >
+              ← Go back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main modal ───────────────────────────────────────────────────────
   return (
     <div className="pa-overlay" style={{ zIndex: 9000 }}>
       <div className="pa-modal" style={{ maxWidth: 420 }}>
@@ -61,12 +136,7 @@ export default function ContributionConfirmationModal({ item, onConfirm, onDefer
             </div>
             {parsedAmount !== item.amount && !isZero && (
               <div style={{ fontSize: 11, color: '#FBBF24', marginTop: 4 }}>
-                ⚠ Plan amount: {formatCurrency(item.amount)} — you're confirming a custom amount
-              </div>
-            )}
-            {isZero && (
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>
-                Entering $0 will skip this contribution without deferring
+                ⚠ Plan amount: {formatCurrency(item.amount)} — confirming a custom amount
               </div>
             )}
           </div>
@@ -81,7 +151,7 @@ export default function ContributionConfirmationModal({ item, onConfirm, onDefer
                 style={{ accentColor: '#D4AF37', width: 16, height: 16 }}
               />
               <span style={{ fontSize: 13, color: '#94A3B8' }}>
-                This is a one-time / lump-sum contribution (not part of regular monthly schedule)
+                One-time / lump-sum contribution
               </span>
             </label>
           )}
@@ -97,32 +167,49 @@ export default function ContributionConfirmationModal({ item, onConfirm, onDefer
               fontSize: 12,
               color: '#FBBF24',
             }}>
-              ⚠ It looks like you already confirmed a contribution of this amount to this account recently.
-              Make sure this is a <strong>new</strong> contribution before confirming.
+              ⚠ Looks like you already confirmed this amount to this account recently — make sure this is a new contribution.
             </div>
           )}
 
-          <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 8 }}>
             {item.isDebt
               ? `This will apply a payment to ${item.accountName} and reduce your balance.`
               : `This will add a contribution to ${item.accountName} and update its balance.`}
           </div>
         </div>
 
-        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button
-            className="pa-confirm-btn"
-            onClick={handleConfirm}
-            disabled={isZero ? false : parsedAmount <= 0}
-          >
-            {isZero ? '⏭ Skip This Contribution' : '✓ Yes, Confirmed'}
+        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Primary confirm */}
+          <button className="pa-confirm-btn" onClick={handleConfirm}>
+            ✓ Yes, Confirmed
           </button>
+
+          {/* Defer 1 day */}
           <button className="pa-defer-btn" onClick={() => onDefer(item.id)}>
             ❌ Not Yet — Ask Tomorrow
           </button>
+
+          {/* Skip entire cycle */}
+          <button
+            onClick={() => setShowSkipForm(true)}
+            style={{
+              background: 'rgba(100,116,139,0.1)',
+              border: '1px solid rgba(100,116,139,0.25)',
+              borderRadius: 8,
+              color: '#94A3B8',
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '10px',
+              cursor: 'pointer',
+            }}
+          >
+            ⏭ I didn't contribute this paycheck
+          </button>
+
+          {/* Session skip */}
           <button
             onClick={() => onDismiss(item.id)}
-            style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', padding: '6px 0' }}
+            style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}
           >
             Skip this session
           </button>
