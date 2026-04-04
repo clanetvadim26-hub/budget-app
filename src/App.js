@@ -20,7 +20,7 @@ import ExpenseBreakdownPanel from './components/panels/ExpenseBreakdownPanel';
 import CashFlowPanel from './components/panels/CashFlowPanel';
 import CalculatorsPanel from './components/panels/CalculatorsPanel';
 import AddExpenseForm from './components/forms/AddExpenseForm';
-import AddIncomeForm from './components/forms/AddIncomeForm';
+import IncomePanel from './components/panels/IncomePanel';
 import AccountsPanel from './components/panels/AccountsPanel';
 import InvestmentsPanel from './components/panels/InvestmentsPanel';
 import DebtPanel from './components/panels/DebtPanel';
@@ -77,7 +77,7 @@ export default function App() {
   // Contribution confirmation persistence
   const [confirmedContributions, setConfirmedContributions] = useLocalStorage('budget_confirmed_contributions', {});
   const [deferredContributions, setDeferredContributions] = useLocalStorage('budget_deferred_contributions', {});
-  const [contributionLog, setContributionLog] = useLocalStorage('budget_contribution_log', []);
+  const [, setContributionLog] = useLocalStorage('budget_contribution_log', []);
   const [settings, setSettings] = useLocalStorage('budget_settings', {});
   const setSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
 
@@ -109,7 +109,6 @@ export default function App() {
   const expensesByCategory = getExpensesByCategory(filteredExpenses);
 
   const monthlyExpenses = getTotalExpenses(filterByMonth(expenses, now));
-  const monthlyIncome   = getTotalIncome(filterByMonth(incomes, now));
 
   // All pending paychecks
   const allPendingPaychecks = useMemo(
@@ -383,27 +382,7 @@ export default function App() {
           </div>
         );
       case 'add-income':
-        return (
-          <div className="form-panel">
-            <AddIncomeForm onAdd={addIncome} />
-            <div className="recent-list-panel">
-              <div className="chart-title">Recent Income</div>
-              {incomes
-                .slice()
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 15)
-                .map((inc) => (
-                  <RecentItem
-                    key={inc.id}
-                    item={inc}
-                    type="income"
-                    onDelete={() => setIncomes((prev) => prev.filter((i) => i.id !== inc.id))}
-                  />
-                ))}
-              {incomes.length === 0 && <div className="empty-state">No income entries yet.</div>}
-            </div>
-          </div>
-        );
+        return <IncomePanel />;
       default:
         return null;
     }

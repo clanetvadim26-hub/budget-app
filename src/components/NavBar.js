@@ -4,7 +4,7 @@ import SyncStatusBar from './SyncStatusBar';
 const NAV_ITEMS = [
   { id: 'overview',     label: 'Overview',     icon: '📊' },
   { id: 'budget-plan',  label: 'Budget Plan',  icon: '📝' },
-  { id: 'calendar',     label: 'Calendar',     icon: '📅' },
+  { id: 'calendar',     label: 'Cal & Budget', icon: '📅' },
   { id: 'expenses',     label: 'Expenses',     icon: '📉' },
   { id: 'cashflow',     label: 'Cash Flow',    icon: '📈' },
   { id: 'accounts',     label: 'Accounts',     icon: '💳' },
@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { id: 'debt',         label: 'Debt',         icon: '🔴' },
   { id: 'calculators',  label: 'Calculators',  icon: '🧮' },
   { id: 'add-expense',  label: 'Add Expense',  icon: '➕' },
-  { id: 'add-income',   label: 'Add Income',   icon: '💵' },
+  { id: 'add-income',   label: 'Income',       icon: '💵' },
 ];
 
 const CONN_META = {

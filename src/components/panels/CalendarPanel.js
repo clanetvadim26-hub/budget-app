@@ -4,6 +4,7 @@ import {
   format, addDays, addWeeks, addMonths, addYears,
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear,
   eachDayOfInterval, isSameMonth, isToday, getDate, getYear,
+  getDaysInMonth,
 } from 'date-fns';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
@@ -332,8 +333,163 @@ function DayView({ day, events, onMarkCCPaid }) {
   );
 }
 
+// ── Budget Tracker ─────────────────────────────────────────────────────────
+function BudgetTracker({ expenses, recurringExpenses }) {
+  const now = new Date();
+  const mStart = startOfMonth(now);
+  const mEnd   = endOfMonth(now);
+  const todayNum = now.getDate();
+  const totalDays = getDaysInMonth(now);
+  const daysLeft = totalDays - todayNum + 1; // including today
+
+  // Budget categories: recurringExpenses where isBudget === true
+  const budgets = useMemo(
+    () => (recurringExpenses || []).filter(e => e.metadata?.isBudget && e.active),
+    [recurringExpenses]
+  );
+
+  // Normalize budget name → category ID (e.g., "Dining Out" → "dining_out")
+  const normalizeName = (name) =>
+    (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+  // Expenses this month
+  const monthExpenses = useMemo(
+    () => expenses.filter(e => {
+      const d = new Date(e.date);
+      return d >= mStart && d <= mEnd;
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [expenses]
+  );
+
+  // Weeks of current month (Mon-Sun)
+  const weeks = useMemo(() => {
+    const result = [];
+    let cursor = startOfWeek(mStart, { weekStartsOn: 1 });
+    while (cursor <= mEnd) {
+      const wEnd = endOfWeek(cursor, { weekStartsOn: 1 });
+      result.push({ start: new Date(cursor), end: new Date(wEnd < mEnd ? wEnd : mEnd) });
+      cursor = addDays(wEnd, 1);
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [expandedCat, setExpandedCat] = useState(null);
+
+  if (budgets.length === 0) {
+    return (
+      <div style={{ padding: 20, textAlign: 'center', color: '#64748B' }}>
+        No budget categories found. Add variable budgets in the Budget Plan → Vadim tab.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: '#64748B', marginBottom: 16 }}>
+        Showing spending vs. budget for <strong style={{ color: '#94A3B8' }}>{format(now, 'MMMM yyyy')}</strong> · {daysLeft} days remaining
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {budgets.map(budget => {
+          const catId   = normalizeName(budget.name);
+          const monthly = Number(budget.amount) || 0;
+          const spent   = monthExpenses
+            .filter(e => e.category === catId || normalizeName(e.category) === catId)
+            .reduce((s, e) => s + Number(e.amount), 0);
+          const remaining   = monthly - spent;
+          const pct         = monthly > 0 ? Math.min((spent / monthly) * 100, 100) : 0;
+          const dailyAllow  = daysLeft > 0 ? Math.max(0, remaining) / daysLeft : 0;
+          const overBudget  = spent > monthly;
+          const barColor    = pct < 50 ? '#4ADE80' : pct < 75 ? '#FBBF24' : '#F87171';
+          const isExpanded  = expandedCat === budget.id;
+
+          // Weekly spending
+          const weeklyData = weeks.map((w, i) => {
+            const wSpent = monthExpenses
+              .filter(e => {
+                const d = new Date(e.date);
+                return (e.category === catId || normalizeName(e.category) === catId) && d >= w.start && d <= w.end;
+              })
+              .reduce((s, e) => s + Number(e.amount), 0);
+            const isCurrentWeek = now >= w.start && now <= w.end;
+            return { label: `Wk ${i + 1} (${format(w.start, 'M/d')}–${format(w.end, 'M/d')})`, spent: wSpent, isCurrent: isCurrentWeek };
+          });
+
+          return (
+            <div key={budget.id} style={{ background: '#0F1829', border: '1px solid #1E293B', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#F1F5F9' }}>{budget.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setExpandedCat(isExpanded ? null : budget.id)}
+                  style={{ background: 'transparent', border: 'none', color: '#64748B', fontSize: 11, cursor: 'pointer', padding: '2px 6px' }}
+                >
+                  {isExpanded ? '▲ Hide weeks' : '▼ Weekly'}
+                </button>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ background: '#1E293B', borderRadius: 4, height: 6, marginBottom: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, background: barColor, height: '100%', borderRadius: 4, transition: 'width 0.3s' }} />
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', marginBottom: 2 }}>Budget</div>
+                  <div style={{ fontSize: 13, color: '#94A3B8' }}>${monthly.toFixed(0)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', marginBottom: 2 }}>Spent</div>
+                  <div style={{ fontSize: 13, color: overBudget ? '#F87171' : '#F1F5F9', fontWeight: overBudget ? 700 : 400 }}>${spent.toFixed(0)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', marginBottom: 2 }}>Remaining</div>
+                  <div style={{ fontSize: 13, color: overBudget ? '#F87171' : '#4ADE80', fontWeight: 600 }}>
+                    {overBudget ? `-$${Math.abs(remaining).toFixed(0)}` : `$${remaining.toFixed(0)}`}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', marginBottom: 2 }}>Daily Left</div>
+                  <div style={{ fontSize: 13, color: '#94A3B8' }}>${dailyAllow.toFixed(0)}/day</div>
+                </div>
+              </div>
+
+              {/* Weekly breakdown */}
+              {isExpanded && (
+                <div style={{ marginTop: 12, borderTop: '1px solid #1E293B', paddingTop: 10 }}>
+                  <div style={{ fontSize: 11, color: '#475569', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Weekly Breakdown</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {weeklyData.map(w => (
+                      <div key={w.label} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '5px 8px', borderRadius: 6,
+                        background: w.isCurrent ? 'rgba(212,175,55,0.08)' : 'transparent',
+                        border: w.isCurrent ? '1px solid rgba(212,175,55,0.2)' : '1px solid transparent',
+                      }}>
+                        <span style={{ fontSize: 12, color: w.isCurrent ? '#D4AF37' : '#64748B' }}>
+                          {w.label}{w.isCurrent ? ' ← current' : ''}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: w.spent > 0 ? '#F1F5F9' : '#334155' }}>
+                          {w.spent > 0 ? `$${w.spent.toFixed(0)}` : '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Calendar ──────────────────────────────────────────────────────────
 export default function CalendarPanel() {
+  const [pageTab, setPageTab]         = useState('calendar'); // 'calendar' | 'budget'
   const [view, setView]               = useState('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(null);
@@ -405,6 +561,33 @@ export default function CalendarPanel() {
 
   return (
     <div className="panel calendar-panel">
+      {/* Page-level tab toggle */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #1E293B', marginBottom: 20 }}>
+        {[
+          { id: 'calendar', label: '📅 Calendar'       },
+          { id: 'budget',   label: '📊 Budget Tracker' },
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setPageTab(t.id)}
+            style={{
+              padding: '10px 18px', background: 'transparent', border: 'none',
+              borderBottom: `2px solid ${pageTab === t.id ? '#D4AF37' : 'transparent'}`,
+              color: pageTab === t.id ? '#D4AF37' : '#64748B',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: -1, transition: 'all 0.15s',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {pageTab === 'budget' && (
+        <BudgetTracker expenses={expenses} recurringExpenses={recurringExpenses} />
+      )}
+
+      {pageTab === 'calendar' && <>
       <div className="cal-toolbar">
         <div className="cal-nav">
           <button className="cal-nav-btn" onClick={() => navigate(-1)}>‹</button>
@@ -474,6 +657,7 @@ export default function CalendarPanel() {
           confirm={confirm}
         />
       )}
+      </>}
     </div>
   );
 }

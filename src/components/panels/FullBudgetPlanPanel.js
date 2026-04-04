@@ -497,6 +497,11 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [amount, setAmount]   = useState('');
   const [confirmedAccounts, setConfirmedAccounts] = useState({});
+  const [, setIncomes] = useLocalStorage('budget_incomes', []);
+  const [existingIncomes] = useLocalStorage('budget_incomes', []);
+  const [logStep, setLogStep] = useState(null); // null | 'confirm' | 'success'
+  const [logDate, setLogDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [logAmount, setLogAmount] = useState('');
 
   const job = JESSICA_JOBS.find((j) => j.id === selectedJob);
 
@@ -544,6 +549,8 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
     setSelectedJob(null);
     setAmount('');
     setConfirmedAccounts({});
+    setLogStep(null);
+    setLogAmount('');
   };
 
   // ── Step 1: Job selector ──────────────────────────────────────────────
@@ -700,6 +707,96 @@ function JessicaPaycheckEntry({ accounts, settings, onContributionConfirmed }) {
           );
         })}
       </div>
+
+      {/* ── Log This Paycheck ── */}
+      {logStep === null && (
+        <button
+          onClick={() => { setLogAmount(String(paycheck.toFixed(2))); setLogDate(format(new Date(), 'yyyy-MM-dd')); setLogStep('confirm'); }}
+          style={{
+            marginTop: 14, width: '100%', background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)',
+            borderRadius: 10, color: '#D4AF37', fontSize: 13, fontWeight: 600, padding: '10px', cursor: 'pointer',
+          }}
+        >
+          📝 Log This Paycheck to Income
+        </button>
+      )}
+
+      {logStep === 'confirm' && (() => {
+        const logPaycheckAmount = Number(logAmount) || paycheck;
+        // Duplicate check: same job within last 14 days
+        const recent = existingIncomes.filter(i =>
+          i.source === 'Jessica' &&
+          (i.metadata?.jobId === job?.id || (i.description || '').includes(job?.label || ''))
+        ).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const lastEntry = recent[0];
+        const hasDuplicate = lastEntry && Math.abs(new Date(logDate) - new Date(lastEntry.date)) < 14 * 24 * 3600 * 1000;
+
+        const handleLogConfirm = () => {
+          const gross = logPaycheckAmount;
+          setIncomes(prev => [...prev, {
+            id: `jessica_${job.id}_${Date.now()}`,
+            date: logDate,
+            source: 'Jessica',
+            description: `${job.label} paycheck`,
+            amount: gross,
+            metadata: { jobId: job.id, is1099: job.is1099, loggedFromBudgetPlan: true },
+          }]);
+          setLogStep('success');
+        };
+
+        return (
+          <div style={{ marginTop: 14, background: '#0F1829', border: '1px solid #2D3F55', borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', marginBottom: 10 }}>📝 Log Paycheck to Income</div>
+            {hasDuplicate && (
+              <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: '#FBBF24' }}>
+                ⚠ You already logged a {job.label} paycheck on {lastEntry.date}. Log another?
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#64748B', display: 'block', marginBottom: 4 }}>AMOUNT</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#D4AF37', fontWeight: 700 }}>$</span>
+                  <input
+                    type="number" min="0" step="0.01" value={logAmount}
+                    onChange={e => setLogAmount(e.target.value)}
+                    style={{ background: '#0A1020', border: '1px solid #1E293B', borderRadius: 6, color: '#F1F5F9', fontSize: 16, fontWeight: 700, padding: '5px 8px', width: '100%' }}
+                  />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, color: '#64748B', display: 'block', marginBottom: 4 }}>DATE</label>
+                <input
+                  type="date" value={logDate} onChange={e => setLogDate(e.target.value)}
+                  style={{ background: '#0A1020', border: '1px solid #1E293B', borderRadius: 6, color: '#F1F5F9', fontSize: 13, padding: '5px 8px', width: '100%' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleLogConfirm}
+                style={{ flex: 1, background: '#D4AF37', border: 'none', borderRadius: 8, color: '#0A0F1E', fontSize: 13, fontWeight: 700, padding: '9px', cursor: 'pointer' }}
+              >
+                ✓ Log Paycheck
+              </button>
+              <button
+                type="button"
+                onClick={() => setLogStep(null)}
+                style={{ background: 'transparent', border: '1px solid #2D3F55', borderRadius: 8, color: '#64748B', fontSize: 12, padding: '9px 14px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {logStep === 'success' && (
+        <div style={{ marginTop: 14, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#4ADE80', textAlign: 'center' }}>
+          ✓ Paycheck logged! ${(Number(logAmount) || paycheck).toFixed(2)} from {job?.label} on {logDate}
+        </div>
+      )}
 
       <button
         onClick={reset}
@@ -1080,7 +1177,7 @@ export default function FullBudgetPlanPanel({ defaultTab = 'vadim' }) {
   const [recurringExpenses, setRecurringExpenses] = useLocalStorage('budget_recurring_expenses', DEFAULT_RECURRING_EXPENSES);
   const [activeTab, setActiveTab] = useState(defaultTab);
 
-  const [contributionLog, setContributionLog] = useLocalStorage('budget_contribution_log', []);
+  const [, setContributionLog] = useLocalStorage('budget_contribution_log', []);
 
   const setSetting = (key, value) => {
     setSettings(prev => {

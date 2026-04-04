@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
+import React, { useState, useMemo } from 'react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { FIXED_CATEGORIES, VARIABLE_CATEGORIES } from '../../data/categories';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 const defaultForm = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -9,9 +10,36 @@ const defaultForm = {
   amount: '',
 };
 
+function normalizeBudgetName(name) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
 export default function AddExpenseForm({ onAdd }) {
   const [form, setForm] = useState(defaultForm);
   const [success, setSuccess] = useState(false);
+  const [expenses] = useLocalStorage('budget_expenses', []);
+  const [recurringExpenses] = useLocalStorage('budget_recurring_expenses', []);
+
+  const now = new Date();
+  const mStart = startOfMonth(now);
+  const mEnd   = endOfMonth(now);
+
+  // Find budget for selected category
+  const budgetInfo = useMemo(() => {
+    if (!form.category) return null;
+    const budgets = (recurringExpenses || []).filter(e => e.metadata?.isBudget && e.active);
+    const match = budgets.find(b => normalizeBudgetName(b.name) === form.category || normalizeBudgetName(b.name) === normalizeBudgetName(form.category));
+    if (!match) return null;
+    const monthlyBudget = Number(match.amount) || 0;
+    const spent = (expenses || [])
+      .filter(e => {
+        const d = new Date(e.date);
+        return d >= mStart && d <= mEnd && (e.category === form.category || normalizeBudgetName(e.category) === form.category);
+      })
+      .reduce((s, e) => s + Number(e.amount), 0);
+    return { name: match.name, monthly: monthlyBudget, spent };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.category, expenses, recurringExpenses]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -83,6 +111,32 @@ export default function AddExpenseForm({ onAdd }) {
             </optgroup>
           </select>
         </div>
+
+        {budgetInfo && (() => {
+          const remaining = budgetInfo.monthly - budgetInfo.spent;
+          const enteredAmt = Number(form.amount) || 0;
+          const wouldBeOver = enteredAmt > 0 && budgetInfo.spent + enteredAmt > budgetInfo.monthly;
+          const overBy = budgetInfo.spent + enteredAmt - budgetInfo.monthly;
+          return (
+            <div style={{
+              margin: '-4px 0 12px',
+              padding: '8px 12px',
+              background: remaining < 0 ? 'rgba(248,113,113,0.08)' : 'rgba(74,222,128,0.06)',
+              border: `1px solid ${remaining < 0 ? 'rgba(248,113,113,0.25)' : 'rgba(74,222,128,0.15)'}`,
+              borderRadius: 8,
+              fontSize: 12,
+            }}>
+              <span style={{ color: remaining < 0 ? '#F87171' : '#4ADE80' }}>
+                {budgetInfo.name}: {remaining >= 0 ? `$${remaining.toFixed(2)} remaining` : `$${Math.abs(remaining).toFixed(2)} over budget`} of ${budgetInfo.monthly.toFixed(2)} this month
+              </span>
+              {wouldBeOver && (
+                <div style={{ color: '#FBBF24', marginTop: 4 }}>
+                  ⚠ This puts {budgetInfo.name} ${overBy.toFixed(2)} over budget
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="form-group">
           <label>Description (optional)</label>

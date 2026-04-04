@@ -29,15 +29,17 @@ export default function ContributionConfirmationModal({
   };
 
   const handleSkipCycleSubmit = () => {
-    const bal = Number(currentBalance);
-    onSkipCycle(item.id, item.accountId, isNaN(bal) ? null : bal);
+    const trimmed = String(currentBalance).trim();
+    const bal = trimmed === '' ? null : Number(trimmed);
+    const balToPass = (bal !== null && !isNaN(bal) && bal >= 0) ? bal : null;
+    onSkipCycle(item.id, item.accountId, balToPass);
   };
 
   // ── Skip-cycle sub-form ──────────────────────────────────────────────
   if (showSkipForm) {
     return (
-      <div className="pa-overlay" style={{ zIndex: 9000 }}>
-        <div className="pa-modal" style={{ maxWidth: 420 }}>
+      <div className="pa-overlay" style={{ zIndex: 10000, alignItems: 'flex-start', paddingTop: '5vh', overflowY: 'auto' }}>
+        <div className="pa-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
           <div className="pa-header">
             <div>
               <div className="pa-subtitle">⏭ Skipping This Paycheck</div>
@@ -64,7 +66,6 @@ export default function ContributionConfirmationModal({
                 placeholder="e.g. 430.00"
                 value={currentBalance}
                 onChange={(e) => setCurrentBalance(e.target.value)}
-                autoFocus
                 style={{
                   background: '#0F1829',
                   border: '1px solid #2D3F55',
@@ -79,12 +80,18 @@ export default function ContributionConfirmationModal({
             </div>
           </div>
           <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="pa-confirm-btn" onClick={handleSkipCycleSubmit}>
+            <button
+              type="button"
+              className="pa-confirm-btn"
+              onClick={(e) => { e.stopPropagation(); handleSkipCycleSubmit(); }}
+              style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+            >
               ✓ Confirm &amp; Skip This Cycle
             </button>
             <button
-              onClick={() => setShowSkipForm(false)}
-              style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', padding: '6px 0' }}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowSkipForm(false); }}
+              style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 13, cursor: 'pointer', padding: '6px 0', pointerEvents: 'auto' }}
             >
               ← Go back
             </button>
@@ -96,8 +103,8 @@ export default function ContributionConfirmationModal({
 
   // ── Main modal ───────────────────────────────────────────────────────
   return (
-    <div className="pa-overlay" style={{ zIndex: 9000 }}>
-      <div className="pa-modal" style={{ maxWidth: 420 }}>
+    <div className="pa-overlay" style={{ zIndex: 10000, alignItems: 'flex-start', paddingTop: '5vh', overflowY: 'auto' }}>
+      <div className="pa-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="pa-header">
           <div>
             <div className="pa-subtitle">
@@ -180,18 +187,19 @@ export default function ContributionConfirmationModal({
 
         <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Primary confirm */}
-          <button className="pa-confirm-btn" onClick={handleConfirm}>
+          <button type="button" className="pa-confirm-btn" onClick={(e) => { e.stopPropagation(); handleConfirm(); }} style={{ cursor: 'pointer', pointerEvents: 'auto' }}>
             ✓ Yes, Confirmed
           </button>
 
           {/* Defer 1 day */}
-          <button className="pa-defer-btn" onClick={() => onDefer(item.id)}>
+          <button type="button" className="pa-defer-btn" onClick={(e) => { e.stopPropagation(); onDefer(item.id); }} style={{ pointerEvents: 'auto' }}>
             ❌ Not Yet — Ask Tomorrow
           </button>
 
           {/* Skip entire cycle */}
           <button
-            onClick={() => setShowSkipForm(true)}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowSkipForm(true); }}
             style={{
               background: 'rgba(100,116,139,0.1)',
               border: '1px solid rgba(100,116,139,0.25)',
@@ -208,8 +216,9 @@ export default function ContributionConfirmationModal({
 
           {/* Session skip */}
           <button
-            onClick={() => onDismiss(item.id)}
-            style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 12, cursor: 'pointer', padding: '4px 0' }}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDismiss(item.id); }}
+            style={{ background: 'transparent', border: 'none', color: '#475569', fontSize: 12, cursor: 'pointer', padding: '4px 0', pointerEvents: 'auto' }}
           >
             Skip this session
           </button>
